@@ -20,7 +20,7 @@ public record ProjectStageRequest(
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("id", id);
         map.put("name", name);
-        map.put("status", status == null || status.isBlank() ? "未开始" : status);
+        map.put("status", status);
         map.put("assignees", safeAssignees().stream().map(StageAssigneeRequest::toMap).toList());
         return map;
     }

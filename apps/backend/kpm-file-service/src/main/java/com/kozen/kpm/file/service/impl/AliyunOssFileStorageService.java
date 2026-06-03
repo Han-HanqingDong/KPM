@@ -42,9 +42,9 @@ public class AliyunOssFileStorageService implements FileStorageService {
 
     @Override
     public FileUploadResult upload(MultipartFile file, String category, String businessId, String uploader) throws IOException {
+        validateUpload(file, category, businessId, uploader);
         OssProperties oss = currentOssProperties();
         ensureReady(oss);
-        validateUpload(file, category, businessId, uploader);
         String originalName = safeOriginalName(file.getOriginalFilename());
         String objectKey = buildObjectKey(oss, category, businessId, originalName);
         ObjectMetadata metadata = new ObjectMetadata();
@@ -54,7 +54,7 @@ public class AliyunOssFileStorageService implements FileStorageService {
         }
         metadata.addUserMetadata("original-name-b64", metadataValue(originalName));
         metadata.addUserMetadata("category", normalizeCategory(category));
-        metadata.addUserMetadata("uploader-b64", metadataValue(uploader == null || uploader.isBlank() ? "unknown" : uploader));
+        metadata.addUserMetadata("uploader-b64", metadataValue(uploader));
 
         OSS ossClient = createClient(oss);
         try {
@@ -72,7 +72,7 @@ public class AliyunOssFileStorageService implements FileStorageService {
                 humanFileSize(file.getSize()),
                 file.getSize(),
                 file.getContentType() == null ? "application/octet-stream" : file.getContentType(),
-                uploader == null || uploader.isBlank() ? "张敏" : uploader,
+                uploader,
                 normalizeCategory(category),
                 oss.getBucket(),
                 objectKey,
@@ -154,7 +154,7 @@ public class AliyunOssFileStorageService implements FileStorageService {
         ValidationUtil.optionalText(file.getOriginalFilename(), "文件名", 255);
         ValidationUtil.optionalText(category, "文件分类", 80);
         ValidationUtil.optionalText(businessId, "业务ID", 120);
-        ValidationUtil.optionalText(uploader, "上传人", 60);
+        ValidationUtil.requireText(uploader, "上传人", 60);
     }
 
     private String buildObjectKey(OssProperties oss, String category, String businessId, String originalName) {

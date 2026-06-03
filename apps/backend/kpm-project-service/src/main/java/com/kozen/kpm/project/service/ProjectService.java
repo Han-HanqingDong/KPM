@@ -7,6 +7,7 @@ import com.kozen.kpm.project.dto.ProcessTemplateRequest;
 import com.kozen.kpm.project.dto.ProjectCustomerStatusRequest;
 import com.kozen.kpm.project.dto.ProjectMembersRequest;
 import com.kozen.kpm.project.dto.ProjectRequest;
+import com.kozen.kpm.project.dto.ProjectSkuRequest;
 import com.kozen.kpm.project.dto.RequirementRequest;
 import com.kozen.kpm.project.dto.StageRecordRequest;
 import com.kozen.kpm.project.dto.StageStatusRequest;
@@ -40,6 +41,18 @@ public interface ProjectService {
 
     /** Replace all project members. */
     Map<String, Object> replaceMembers(String id, ProjectMembersRequest request);
+
+    /** Query project SKU list. */
+    List<Map<String, Object>> skus(String projectId);
+
+    /** Create a project SKU. */
+    Map<String, Object> createSku(String projectId, ProjectSkuRequest request, String operator);
+
+    /** Update a project SKU. */
+    Map<String, Object> updateSku(String projectId, String skuId, ProjectSkuRequest request, String operator);
+
+    /** Logically delete a project SKU. */
+    boolean deleteSku(String projectId, String skuId, String operator);
 
     /** Link or update a customer under the project. */
     Map<String, Object> linkCustomer(String projectId, LinkCustomerRequest request);

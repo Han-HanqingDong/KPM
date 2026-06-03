@@ -18,8 +18,9 @@
       </div>
       <button id="login-language-toggle" class="login-language-toggle hidden" type="button" data-i18n="language">中文 / EN</button>
       <div class="login-brand">
-        <strong>KPM</strong>
+        <strong>KOZEN KPM</strong>
         <span data-i18n="brand.subtitle">Kozen Project Management</span>
+        <em>KOZEN, TO COLLABORATE WITH GLOBAL LEADERS</em>
       </div>
       <form id="login-form" class="login-form">
         <label>
@@ -39,8 +40,9 @@
 
   <div id="app-shell" class="app-shell hidden">
     <aside class="sidebar">
+      <button id="sidebar-toggle" class="sidebar-toggle" type="button" title="收起 / 展开菜单">☰</button>
       <div class="brand">
-        <div class="brand-mark">K</div>
+        <div class="brand-mark kozen-logo"><span>K</span></div>
         <div>
           <strong>KPM</strong>
           <span data-i18n="brand.subtitle">Kozen Project Management</span>
@@ -57,6 +59,19 @@
         <button class="nav-item" data-view="templates" data-i18n="menu.templates">流程模板</button>
         <button class="nav-item" data-view="resources" data-i18n="menu.resources">资源管理</button>
       </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-menu">
+          <button id="user-menu-trigger" class="user-chip compact-user" title="用户菜单">
+            <span>张敏</span>
+            <small>系统管理员</small>
+          </button>
+          <div id="user-dropdown" class="user-dropdown">
+            <button data-action="open-change-password" data-i18n="user.changePassword">修改密码</button>
+            <button data-action="logout" data-i18n="user.logout">退出登录</button>
+          </div>
+        </div>
+      </div>
     </aside>
 
     <main class="main">
@@ -80,16 +95,6 @@
             </div>
           </div>
           <button id="language-toggle" class="ghost-btn hidden">中文 / EN</button>
-          <div class="user-menu">
-            <button id="user-menu-trigger" class="user-chip">
-              <span>张敏</span>
-              <small>系统管理员</small>
-            </button>
-            <div id="user-dropdown" class="user-dropdown">
-              <button data-action="open-change-password" data-i18n="user.changePassword">修改密码</button>
-              <button data-action="logout" data-i18n="user.logout">退出登录</button>
-            </div>
-          </div>
         </div>
       </header>
 
@@ -276,6 +281,7 @@
           <button class="tab" data-tab="customer-statuses">客户项目状态配置</button>
           <button class="tab" data-tab="customer-levels">客户等级配置</button>
           <button class="tab" data-tab="order-types">订单类型配置</button>
+          <button class="tab" data-tab="order-statuses">订单状态配置</button>
           <button class="tab" data-tab="task-statuses">任务状态配置</button>
         </div>
         <div id="resource-content" class="panel org-panel"></div>

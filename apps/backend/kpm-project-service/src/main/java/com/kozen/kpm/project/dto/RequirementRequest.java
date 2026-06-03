@@ -14,7 +14,7 @@ public record RequirementRequest(
         @NotBlank(message = "优先级不能为空") @Size(max = 20, message = "优先级不能超过20个字符") String priority,
         @Size(max = 40, message = "需求状态不能超过40个字符") String status,
         @Size(max = 60, message = "提出人不能超过60个字符") String proposer,
-        @Size(max = 60, message = "创建人不能超过60个字符") String creator,
+        @NotBlank(message = "创建人不能为空") @Size(max = 60, message = "创建人不能超过60个字符") String creator,
         Boolean createTask
 ) {
     public Map<String, Object> toMap() {
@@ -24,7 +24,7 @@ public record RequirementRequest(
         map.put("businessValue", businessValue);
         map.put("acceptance", acceptance);
         map.put("priority", priority);
-        map.put("status", status == null || status.isBlank() ? "待评估" : status);
+        map.put("status", status);
         map.put("proposer", proposer);
         map.put("creator", creator);
         map.put("createTask", createTask == null || createTask);

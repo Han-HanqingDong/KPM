@@ -1,106 +1,133 @@
 package com.kozen.kpm.task.mapper;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.kozen.kpm.common.mapper.JdbcMapMapper;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.stereotype.Repository;
+import com.kozen.kpm.common.util.JsonUtil;
+import org.apache.ibatis.annotations.Delete;
+import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
 import java.util.Map;
 
-/** Task data access mapper. */
-@Repository
-public class TaskMapper extends JdbcMapMapper {
-    private final ObjectMapper objectMapper = new ObjectMapper();
+/** Task data access mapper backed by MyBatis. */
+@Mapper
+public interface TaskMapper {
+    @Select("select id, account, email, name from kpm_users where account=#{value} or email=#{value} or name=#{value}")
+    List<Map<String, Object>> usersByAccountOrName(@Param("value") Object value);
 
-    public TaskMapper(JdbcTemplate jdbc) { super(jdbc); }
+    @Select("""
+            select semantic from kpm_enum_items
+            where enum_type=#{enumType} and value=#{value} and active=true
+            limit 1
+            """)
+    String enumSemantic(@Param("enumType") String enumType, @Param("value") String value);
 
-    public List<Map<String, Object>> usersByAccountOrName(Object value) {
-        return rows("select id, account, email, name from kpm_users where account=? or email=? or name=?", value, value, value);
-    }
+    @Select("""
+            select value from kpm_enum_items
+            where enum_type=#{enumType} and semantic=#{semantic} and active=true
+            order by sort_order, id
+            limit 1
+            """)
+    String enumValueBySemantic(@Param("enumType") String enumType, @Param("semantic") String semantic);
 
-    public List<Map<String, Object>> list(String like, String status, String category) { return rows("""
+    @Select("""
             select t.*, p.external_name as project_name, s.stage_name, c.name as customer_name
             from kpm_tasks t
             left join kpm_projects p on p.id = t.project_id
             left join kpm_project_stages s on s.id = t.stage_id
             left join kpm_customers c on c.id = t.customer_id
-            where (? = '' or t.title ilike ? or t.description ilike ?)
-              and (? = '' or t.status = ?)
-              and (? = '' or t.category = ?)
+            where t.del_flag=0
+              and (#{like} = '' or t.title ilike #{like} or t.description ilike #{like})
+              and (#{status} = '' or t.status = #{status})
+              and (#{category} = '' or t.category = #{category})
             order by t.updated_at desc, t.created_at desc
-            """, like, like, like, status, status, category, category); }
+            """)
+    List<Map<String, Object>> list(@Param("like") String like, @Param("status") String status, @Param("category") String category);
 
-    public Map<String, Object> load(String id) { return row("""
+    @Select("""
             select t.*, p.external_name as project_name, s.stage_name, c.name as customer_name
             from kpm_tasks t
             left join kpm_projects p on p.id = t.project_id
             left join kpm_project_stages s on s.id = t.stage_id
             left join kpm_customers c on c.id = t.customer_id
-            where t.id = ?
-            """, id); }
+            where t.id = #{id} and t.del_flag=0
+            """)
+    Map<String, Object> load(@Param("id") String id);
 
-    public void insert(String id, Map<String, Object> body, String projectId, String stageId, String customerId, String creatorUserId, String creatorName) { update("""
+    @Insert("""
             insert into kpm_tasks (id, title, description, project_id, stage_id, category, status, priority, creator_user_id, creator, expected_completion_at, due_date, source, customer_id, blocked)
-            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, cast(? as date), cast(? as date), ?, ?, ?)
-            """, id, body.get("title"), body.get("description"), projectId, stageId, body.getOrDefault("category", "其他"), body.getOrDefault("status", "待处理"), body.getOrDefault("priority", "中"), creatorUserId, creatorName, body.get("expectedCompletionAt"), body.get("dueDate"), body.getOrDefault("source", "任务管理"), customerId, body.getOrDefault("blocked", false)); }
+            values (#{id}, #{body.title}, #{body.description}, #{projectId}, #{stageId}, #{body.category}, #{body.status}, #{body.priority}, #{creatorUserId}, #{creatorName}, cast(#{body.expectedCompletionAt} as date), cast(#{body.dueDate} as date), #{body.source}, #{customerId}, #{body.blocked})
+            """)
+    void insert(@Param("id") String id, @Param("body") Map<String, Object> body, @Param("projectId") String projectId, @Param("stageId") String stageId, @Param("customerId") String customerId, @Param("creatorUserId") String creatorUserId, @Param("creatorName") String creatorName);
 
-    public void updateTask(String id, Map<String, Object> body, String projectId, String stageId, String customerId) { update("""
-            update kpm_tasks set title=?, description=?, project_id=?, stage_id=?, category=?, status=?, priority=?, expected_completion_at=cast(? as date), due_date=cast(? as date), customer_id=?, blocked=?, updated_at=current_timestamp
-            where id=?
-            """, body.get("title"), body.get("description"), projectId, stageId, body.getOrDefault("category", "其他"), body.getOrDefault("status", "待处理"), body.getOrDefault("priority", "中"), body.get("expectedCompletionAt"), body.get("dueDate"), customerId, body.getOrDefault("blocked", false), id); }
+    @Update("""
+            update kpm_tasks set title=#{body.title}, description=#{body.description}, project_id=#{projectId}, stage_id=#{stageId}, category=#{body.category}, status=#{body.status}, priority=#{body.priority}, expected_completion_at=cast(#{body.expectedCompletionAt} as date), due_date=cast(#{body.dueDate} as date), customer_id=#{customerId}, blocked=#{body.blocked}, updated_at=current_timestamp
+            where id=#{id} and del_flag=0
+            """)
+    void updateTask(@Param("id") String id, @Param("body") Map<String, Object> body, @Param("projectId") String projectId, @Param("stageId") String stageId, @Param("customerId") String customerId);
 
-    public void deleteById(String id) { update("delete from kpm_tasks where id=?", id); }
-    public List<String> assignees(String id) { return column("""
+    @Update("update kpm_tasks set del_flag=1, updated_at=current_timestamp, update_time=current_timestamp where id=#{id}")
+    void deleteById(@Param("id") String id);
+
+    @Select("""
             select coalesce(u.name, ta.assignee_name)
             from kpm_task_assignees ta
             left join kpm_users u on u.id = ta.user_id or (ta.user_id is null and u.name = ta.assignee_name)
-            where ta.task_id=? order by coalesce(u.name, ta.assignee_name)
-            """, String.class, id); }
-    public List<String> participants(String id) { return column("""
+            where ta.task_id=#{id} and ta.del_flag=0 order by coalesce(u.name, ta.assignee_name)
+            """)
+    List<String> assignees(@Param("id") String id);
+
+    @Select("""
             select coalesce(u.name, tp.participant_name)
             from kpm_task_participants tp
             left join kpm_users u on u.id = tp.user_id or (tp.user_id is null and u.name = tp.participant_name)
-            where tp.task_id=? order by coalesce(u.name, tp.participant_name)
-            """, String.class, id); }
-    public List<Map<String, Object>> attachments(String id) { return rows("select * from kpm_task_attachments where task_id=? order by uploaded_at desc", id); }
-    public List<Map<String, Object>> comments(String id) { return rows("select * from kpm_task_comments where task_id=? order by created_at desc", id); }
-    public void deleteAssignees(String id) { update("delete from kpm_task_assignees where task_id=?", id); }
-    public void insertAssignee(String id, String userId, Object name) { update("insert into kpm_task_assignees (task_id, user_id, assignee_name) values (?, ?, ?)", id, userId, name); }
-    public void deleteParticipants(String id) { update("delete from kpm_task_participants where task_id=?", id); }
-    public void insertParticipant(String id, String userId, Object name) { update("insert into kpm_task_participants (task_id, user_id, participant_name) values (?, ?, ?)", id, userId, name); }
-    public void syncRequirement(String taskId, String requirementStatus) { update("update kpm_requirements set status=? where task_id=?", requirementStatus, taskId); }
-    public Integer maxTaskNumber() { return jdbc.queryForObject("select coalesce(max(cast(regexp_replace(id, '[^0-9]', '', 'g') as int)), 100) from kpm_tasks where id like 'KPM-%'", Integer.class); }
-    public void insertComment(String commentId, String taskId, Object author, Object content, Object attachments) {
-        update("insert into kpm_task_comments (id, task_id, author, content, attachments) values (?, ?, ?, ?, cast(? as jsonb))",
-                commentId, taskId, author, content, json(attachments));
+            where tp.task_id=#{id} and tp.del_flag=0 order by coalesce(u.name, tp.participant_name)
+            """)
+    List<String> participants(@Param("id") String id);
+
+    @Select("select * from kpm_task_attachments where task_id=#{id} and del_flag=0 order by uploaded_at desc")
+    List<Map<String, Object>> attachments(@Param("id") String id);
+
+    @Select("select * from kpm_task_comments where task_id=#{id} and del_flag=0 order by created_at desc")
+    List<Map<String, Object>> comments(@Param("id") String id);
+
+    @Delete("delete from kpm_task_assignees where task_id=#{id}")
+    void deleteAssignees(@Param("id") String id);
+
+    @Insert("insert into kpm_task_assignees (task_id, user_id, assignee_name) values (#{id}, #{userId}, #{name})")
+    void insertAssignee(@Param("id") String id, @Param("userId") String userId, @Param("name") Object name);
+
+    @Delete("delete from kpm_task_participants where task_id=#{id}")
+    void deleteParticipants(@Param("id") String id);
+
+    @Insert("insert into kpm_task_participants (task_id, user_id, participant_name) values (#{id}, #{userId}, #{name})")
+    void insertParticipant(@Param("id") String id, @Param("userId") String userId, @Param("name") Object name);
+
+    @Update("update kpm_requirements set status=#{requirementStatus} where task_id=#{taskId}")
+    void syncRequirement(@Param("taskId") String taskId, @Param("requirementStatus") String requirementStatus);
+
+    @Select("select coalesce(max(cast(regexp_replace(id, '[^0-9]', '', 'g') as int)), 100) from kpm_tasks where id like 'KPM-%' and del_flag=0")
+    Integer maxTaskNumber();
+
+    default void insertComment(String commentId, String taskId, Object author, Object content, Object attachments) {
+        insertCommentRow(commentId, taskId, author, content, JsonUtil.toJson(attachments == null ? List.of() : attachments));
     }
 
-    public void insertNotificationEvent(String id, String eventType, String aggregateId, String title, String content, String recipientUserIdsJson) {
-        update("""
-                insert into kpm_notification_events (id, event_type, aggregate_type, aggregate_id, title, content, recipient_user_ids, status)
-                values (?, ?, 'task', ?, ?, ?, cast(? as jsonb), 'PENDING')
-                """, id, eventType, aggregateId, title, content, recipientUserIdsJson);
-    }
+    @Insert("insert into kpm_task_comments (id, task_id, author, content, attachments) values (#{commentId}, #{taskId}, #{author}, #{content}, cast(#{attachmentsJson} as jsonb))")
+    void insertCommentRow(@Param("commentId") String commentId, @Param("taskId") String taskId, @Param("author") Object author, @Param("content") Object content, @Param("attachmentsJson") String attachmentsJson);
 
-    public void insertAttachment(String attachmentId, String taskId, Map<String, Object> body) {
-        update("""
-                insert into kpm_task_attachments
-                (id, task_id, file_name, file_type, file_size, uploader, bucket, object_key, storage_url, storage_category)
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                attachmentId, taskId, body.get("fileName"), body.getOrDefault("fileType", "文件"),
-                body.getOrDefault("fileSize", "-"), body.getOrDefault("uploader", "张敏"),
-                body.get("bucket"), body.get("objectKey"), body.get("storageUrl"), body.get("category"));
-    }
+    @Insert("""
+            insert into kpm_notification_events (id, event_type, aggregate_type, aggregate_id, title, content, recipient_user_ids, status)
+            values (#{id}, #{eventType}, 'task', #{aggregateId}, #{title}, #{content}, cast(#{recipientUserIdsJson} as jsonb), 'PENDING')
+            """)
+    void insertNotificationEvent(@Param("id") String id, @Param("eventType") String eventType, @Param("aggregateId") String aggregateId, @Param("title") String title, @Param("content") String content, @Param("recipientUserIdsJson") String recipientUserIdsJson);
 
-    private String json(Object value) {
-        Object safeValue = value == null ? List.of() : value;
-        try {
-            return objectMapper.writeValueAsString(safeValue);
-        } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("Invalid JSON payload", e);
-        }
-    }
+    @Insert("""
+            insert into kpm_task_attachments
+            (id, task_id, file_name, file_type, file_size, uploader, bucket, object_key, storage_url, storage_category)
+            values (#{attachmentId}, #{taskId}, #{body.fileName}, #{body.fileType}, #{body.fileSize}, #{body.uploader}, #{body.bucket}, #{body.objectKey}, #{body.storageUrl}, #{body.category})
+            """)
+    void insertAttachment(@Param("attachmentId") String attachmentId, @Param("taskId") String taskId, @Param("body") Map<String, Object> body);
 }

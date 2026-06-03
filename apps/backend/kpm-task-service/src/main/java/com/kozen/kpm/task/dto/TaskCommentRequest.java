@@ -1,12 +1,14 @@
 package com.kozen.kpm.task.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 import java.util.List;
 
 @Schema(description = "任务评论保存请求")
 public record TaskCommentRequest(
+        @NotBlank(message = "作者不能为空")
         @Size(max = 64, message = "作者不能超过64个字符")
         String author,
         @Size(max = 2000, message = "评论内容不能超过2000个字符")

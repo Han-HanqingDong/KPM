@@ -190,6 +190,9 @@ public class BearerTokenGatewayFilter implements GlobalFilter, Ordered {
             if (path.equals("/api/projects/templates")) return "POST".equals(verb) ? "button:templates:create" : null;
             if (path.matches("/api/projects/templates/[^/]+")) return "DELETE".equals(verb) ? "button:templates:delete" : "button:templates:edit";
             if (path.matches("/api/projects/[^/]+/members")) return "button:project-detail:edit-members";
+            if (path.matches("/api/projects/[^/]+/skus") && "POST".equals(verb)) return "button:project-skus:save";
+            if (path.matches("/api/projects/[^/]+/skus/[^/]+") && "PUT".equals(verb)) return "button:project-skus:save";
+            if (path.matches("/api/projects/[^/]+/skus/[^/]+") && "DELETE".equals(verb)) return "button:project-skus:delete";
             if (path.matches("/api/projects/[^/]+/archive")) return "button:projects:archive";
             if (path.matches("/api/projects/stages/[^/]+/records")) return "button:stage-detail:publish-record";
             if (path.matches("/api/projects/stages/[^/]+/materials")) return "button:stage-detail:publish-file";

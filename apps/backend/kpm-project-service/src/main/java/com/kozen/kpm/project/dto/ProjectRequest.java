@@ -24,7 +24,7 @@ public record ProjectRequest(
 ) {
     public List<ProjectMemberRequest> safeMembers() { return members == null ? List.of() : members; }
     public List<ProjectStageRequest> safeStages() { return stages == null ? List.of() : stages; }
-    public String safeSalesability() { return salesability == null || salesability.isBlank() ? "不可销售" : salesability; }
+    public String safeSalesability() { return salesability; }
     public Object safeUnsellableReason() { return "可销售".equals(safeSalesability()) ? null : unsellableReason; }
 
     public Map<String, Object> toMap() {
@@ -33,7 +33,7 @@ public record ProjectRequest(
         map.put("internalName", internalName);
         map.put("modelName", modelName);
         map.put("managerAccount", managerAccount);
-        map.put("status", status == null || status.isBlank() ? "未开始" : status);
+        map.put("status", status);
         map.put("salesability", safeSalesability());
         map.put("unsellableReason", safeUnsellableReason());
         map.put("description", description);

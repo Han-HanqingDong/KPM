@@ -1,53 +1,56 @@
 package com.kozen.kpm.iam.mapper;
 
-import com.kozen.kpm.common.mapper.JdbcMapMapper;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.stereotype.Repository;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
 import java.util.Map;
 
-/** IAM data access mapper. */
-@Repository
-public class IamMapper extends JdbcMapMapper {
-    public IamMapper(JdbcTemplate jdbc) { super(jdbc); }
+/** IAM data access mapper backed by MyBatis. */
+@Mapper
+public interface IamMapper {
+    @Select("""
+            select id, account, email, name, password_hash, status
+            from kpm_users
+            where account = #{account} or email = #{account}
+            """)
+    List<Map<String, Object>> findUserForLogin(@Param("account") String account);
 
-    public List<Map<String, Object>> findUserForLogin(String account) {
-        return rows("select id, account, email, name, password_hash, status from kpm_users where account = ? or email = ?", account, account);
-    }
+    @Select("""
+            select id, account, email, name, status
+            from kpm_users
+            where account = #{account} or email = #{account}
+            """)
+    List<Map<String, Object>> findUser(@Param("account") String account);
 
-    public List<Map<String, Object>> findUser(String account) {
-        return rows("select id, account, email, name, status from kpm_users where account = ? or email = ?", account, account);
-    }
+    @Update("update kpm_users set password_hash = #{passwordHash}, updated_at = current_timestamp, update_time = current_timestamp where id = #{userId}")
+    void updatePassword(@Param("userId") String userId, @Param("passwordHash") String passwordHash);
 
-    public void updatePassword(String userId, String passwordHash) {
-        update("update kpm_users set password_hash = ? where id = ?", passwordHash, userId);
-    }
+    @Select("""
+            select d.name from kpm_departments d
+            join kpm_user_departments ud on ud.department_id = d.id
+            where ud.user_id = #{userId}
+            order by d.name
+            """)
+    List<String> departments(@Param("userId") String userId);
 
-    public List<String> departments(String userId) {
-        return column("""
-                select d.name from kpm_departments d
-                join kpm_user_departments ud on ud.department_id = d.id
-                where ud.user_id = ? order by d.name
-                """, String.class, userId);
-    }
+    @Select("""
+            select r.name from kpm_roles r
+            join kpm_user_roles ur on ur.role_id = r.id
+            where ur.user_id = #{userId}
+            order by r.name
+            """)
+    List<String> roles(@Param("userId") String userId);
 
-    public List<String> roles(String userId) {
-        return column("""
-                select r.name from kpm_roles r
-                join kpm_user_roles ur on ur.role_id = r.id
-                where ur.user_id = ? order by r.name
-                """, String.class, userId);
-    }
-
-    public List<String> permissions(String userId) {
-        return column("""
-                select distinct p.code from kpm_permissions p
-                left join kpm_user_permissions up on up.permission_id = p.id and up.user_id = ?
-                left join kpm_role_permissions rp on rp.permission_id = p.id
-                left join kpm_user_roles ur on ur.role_id = rp.role_id and ur.user_id = ?
-                where up.user_id is not null or ur.user_id is not null
-                order by p.code
-                """, String.class, userId, userId);
-    }
+    @Select("""
+            select distinct p.code from kpm_permissions p
+            left join kpm_user_permissions up on up.permission_id = p.id and up.user_id = #{userId}
+            left join kpm_role_permissions rp on rp.permission_id = p.id
+            left join kpm_user_roles ur on ur.role_id = rp.role_id and ur.user_id = #{userId}
+            where up.user_id is not null or ur.user_id is not null
+            order by p.code
+            """)
+    List<String> permissions(@Param("userId") String userId);
 }

@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+LOCAL_NACOS_CONFIG_DIR="${KPM_LOCAL_NACOS_CONFIG_DIR:-$ROOT_DIR/.local/nacos/configs}"
+mkdir -p "$LOCAL_NACOS_CONFIG_DIR"
+
 NACOS_ADDR="${KPM_NACOS_ADDR:-127.0.0.1:8848}"
 NAMESPACE="${KPM_NACOS_NAMESPACE:-public}"
 GROUP="${KPM_NACOS_CONFIG_GROUP:-DEFAULT_GROUP}"
@@ -19,7 +23,41 @@ publish() {
     --data-urlencode "group=${GROUP}" \
     --data-urlencode "dataId=${data_id}" \
     --data-urlencode "content=${content}" >/dev/null
+  maybe_backup_config "${data_id}" "${content}"
   echo "Published ${data_id} to namespace=${NAMESPACE}, group=${GROUP}"
+}
+
+config_backup_path() {
+  local data_id="$1"
+  printf '%s/%s' "$LOCAL_NACOS_CONFIG_DIR" "$data_id"
+}
+
+maybe_backup_config() {
+  local data_id="$1"
+  local content="$2"
+  if has_non_empty_secret "${content}"; then
+    local backup_path
+    backup_path="$(config_backup_path "$data_id")"
+    umask 077
+    printf '%s
+' "${content}" > "${backup_path}"
+    chmod 600 "${backup_path}"
+  fi
+}
+
+has_non_empty_secret() {
+  local content="$1"
+  printf '%s
+' "${content}" | grep -Eq 'access-key-secret:[[:space:]]*[^[:space:]]+'
+}
+
+fetch_backup_config() {
+  local data_id="$1"
+  local backup_path
+  backup_path="$(config_backup_path "$data_id")"
+  if [[ -f "$backup_path" ]]; then
+    cat "$backup_path"
+  fi
 }
 
 fetch_config() {
@@ -35,6 +73,25 @@ extract_oss_block() {
     /^  oss:/ { in_oss=1 }
     in_oss && /^  [A-Za-z0-9_-]+:/ && !/^  oss:/ { exit }
     in_oss { print }
+  '
+}
+
+normalize_oss_block() {
+  local content="$1"
+  local enabled="${KPM_OSS_ENABLED:-true}"
+  printf '%s\n' "${content}" | awk -v enabled="${enabled}" '
+    BEGIN { seen_enabled=0 }
+    /^[[:space:]]+enabled:/ {
+      print "    enabled: " enabled
+      seen_enabled=1
+      next
+    }
+    { print }
+    END {
+      if (!seen_enabled) {
+        print "    enabled: " enabled
+      }
+    }
   '
 }
 
@@ -55,8 +112,15 @@ YAML
 
   local existing_oss
   existing_oss="$(fetch_config kpm-file-service.yaml | extract_oss_block)"
-  if [[ -n "${existing_oss}" && "${existing_oss}" == *"access-key-id:"* && "${existing_oss}" == *"access-key-secret:"* ]]; then
-    printf '%s\n' "${existing_oss}"
+  if [[ -n "${existing_oss}" ]] && has_non_empty_secret "${existing_oss}"; then
+    normalize_oss_block "${existing_oss}"
+    return
+  fi
+
+  local backup_oss
+  backup_oss="$(fetch_backup_config kpm-file-service.yaml | extract_oss_block)"
+  if [[ -n "${backup_oss}" ]] && has_non_empty_secret "${backup_oss}"; then
+    normalize_oss_block "${backup_oss}"
     return
   fi
 

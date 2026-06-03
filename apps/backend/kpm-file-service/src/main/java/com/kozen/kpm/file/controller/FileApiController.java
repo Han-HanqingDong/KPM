@@ -36,7 +36,7 @@ public class FileApiController {
             @RequestParam("file") MultipartFile file,
             @RequestParam(defaultValue = "general") String category,
             @RequestParam(required = false) String businessId,
-            @RequestParam(defaultValue = "张敏") String uploader
+            @RequestParam @NotBlank String uploader
     ) throws IOException {
         return ApiResponse.ok(fileStorageService.upload(file, category, businessId, uploader));
     }

@@ -23,6 +23,7 @@ DROP TABLE IF EXISTS kpm_stage_materials CASCADE;
 DROP TABLE IF EXISTS kpm_stage_assignees CASCADE;
 DROP TABLE IF EXISTS kpm_project_stages CASCADE;
 DROP TABLE IF EXISTS kpm_project_members CASCADE;
+DROP TABLE IF EXISTS kpm_project_skus CASCADE;
 DROP TABLE IF EXISTS kpm_projects CASCADE;
 DROP TABLE IF EXISTS kpm_template_stages CASCADE;
 DROP TABLE IF EXISTS kpm_process_templates CASCADE;
@@ -184,6 +185,17 @@ CREATE TABLE kpm_projects (
   salesability TEXT NOT NULL DEFAULT '不可销售',
   unsellable_reason TEXT,
   description TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE kpm_project_skus (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES kpm_projects(id) ON DELETE CASCADE,
+  whole_machine_part_number TEXT NOT NULL,
+  configuration_name TEXT NOT NULL,
+  memory_type TEXT NOT NULL,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -391,11 +403,15 @@ CREATE TABLE kpm_orders (
   order_date DATE NOT NULL,
   customer_id TEXT NOT NULL REFERENCES kpm_customers(id),
   project_id TEXT NOT NULL REFERENCES kpm_projects(id),
+  sku_id TEXT REFERENCES kpm_project_skus(id),
+  sku_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
   order_type TEXT NOT NULL,
+  status TEXT NOT NULL,
   quantity INT NOT NULL,
   specification TEXT NOT NULL,
   expected_ship_date DATE,
   planned_ship_date DATE,
+  actual_ship_date DATE,
   software_version TEXT,
   currency TEXT NOT NULL,
   unit_price NUMERIC(14, 2) NOT NULL DEFAULT 0,

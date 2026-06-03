@@ -3,6 +3,7 @@ package com.kozen.kpm.customer.service.impl;
 import com.kozen.kpm.common.dto.FileMetadataRequest;
 import com.kozen.kpm.common.util.IdUtil;
 import com.kozen.kpm.common.util.SqlParamUtil;
+import com.kozen.kpm.common.util.ValidationUtil;
 import com.kozen.kpm.customer.converter.CustomerContactConverter;
 import com.kozen.kpm.customer.dto.CustomerContactRequest;
 import com.kozen.kpm.customer.dto.CustomerFollowupRequest;
@@ -44,7 +45,10 @@ public class CustomerServiceImpl implements CustomerService {
     @Transactional
     public Map<String, Object> create(CustomerRequest request) {
         String id = uniqueCustomerId(request.name());
-        customerMapper.insert(id, request.toMap());
+        Map<String, Object> body = request.toMap();
+        body.put("level", resolveDefault(body.get("level"), "customer_level", "客户等级"));
+        body.put("status", resolveDefault(body.get("status"), "customer_master_status", "客户状态"));
+        customerMapper.insert(id, body);
         replaceOwners(id, request);
         return detail(id);
     }
@@ -52,7 +56,10 @@ public class CustomerServiceImpl implements CustomerService {
     @Override
     @Transactional
     public Map<String, Object> update(String id, CustomerRequest request) {
-        customerMapper.updateCustomer(id, request.toMap());
+        Map<String, Object> body = request.toMap();
+        body.put("level", resolveDefault(body.get("level"), "customer_level", "客户等级"));
+        body.put("status", resolveDefault(body.get("status"), "customer_master_status", "客户状态"));
+        customerMapper.updateCustomer(id, body);
         replaceOwners(id, request);
         return detail(id);
     }
@@ -85,7 +92,7 @@ public class CustomerServiceImpl implements CustomerService {
         if (!hasText && !hasFiles) {
             throw new IllegalArgumentException("跟进记录内容或附件不能为空");
         }
-        String author = request.author() == null || request.author().isBlank() ? "张敏" : request.author();
+        String author = ValidationUtil.requireText(request.author(), "跟进记录作者", 64);
         customerMapper.insertFollowup(IdUtil.nanoId("cf"), id, author, request.content(), request.safeAttachments());
         return detail(id);
     }
@@ -95,6 +102,17 @@ public class CustomerServiceImpl implements CustomerService {
     public Map<String, Object> addMaterial(String id, FileMetadataRequest request) {
         customerMapper.insertMaterial(IdUtil.nanoId("cm"), id, request.toMap());
         return detail(id);
+    }
+
+    private String resolveDefault(Object value, String enumType, String label) {
+        if (value != null && !String.valueOf(value).isBlank()) {
+            return String.valueOf(value);
+        }
+        String defaultValue = customerMapper.defaultEnumValue(enumType);
+        if (defaultValue == null || defaultValue.isBlank()) {
+            throw new IllegalArgumentException(label + "未配置默认枚举值，请先在资源管理中配置");
+        }
+        return defaultValue;
     }
 
     private void enrichCustomer(Map<String, Object> customer) {

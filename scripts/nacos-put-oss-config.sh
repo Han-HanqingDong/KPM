@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+LOCAL_NACOS_CONFIG_DIR="${KPM_LOCAL_NACOS_CONFIG_DIR:-$ROOT_DIR/.local/nacos/configs}"
+mkdir -p "$LOCAL_NACOS_CONFIG_DIR"
+
 NACOS_ADDR="${KPM_NACOS_ADDR:-127.0.0.1:8848}"
 NACOS_GROUP="${KPM_NACOS_CONFIG_GROUP:-DEFAULT_GROUP}"
 NACOS_NAMESPACE="${KPM_NACOS_NAMESPACE:-public}"
@@ -39,6 +43,7 @@ TMP_FILE="$(mktemp)"
 cleanup() { rm -f "$TMP_FILE"; }
 trap cleanup EXIT
 
+BACKUP_FILE="$LOCAL_NACOS_CONFIG_DIR/$DATA_ID"
 cat > "$TMP_FILE" <<CONFIG
 server:
   port: 8107
@@ -83,5 +88,8 @@ publish_config() {
 }
 
 publish_config "$NACOS_NAMESPACE" >/tmp/kpm-nacos-put-oss-namespace.out
+umask 077
+cp "$TMP_FILE" "$BACKUP_FILE"
+chmod 600 "$BACKUP_FILE"
 
-echo "Nacos OSS file-service config published: dataId=${DATA_ID} group=${NACOS_GROUP} namespace=${NACOS_NAMESPACE} bucket=${OSS_BUCKET} root=${OSS_ROOT_PREFIX}"
+echo "Nacos OSS file-service config published and backed up locally: dataId=${DATA_ID} group=${NACOS_GROUP} namespace=${NACOS_NAMESPACE} bucket=${OSS_BUCKET} root=${OSS_ROOT_PREFIX}"

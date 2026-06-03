@@ -48,6 +48,8 @@ INSERT INTO kpm_permissions (id, code, name, permission_type, target, location) 
 ('perm-button-project-detail-materials-entry','button:project-detail:materials-entry','项目详情 / 项目资料区入口','按钮权限','进入','项目详情'),
 ('perm-button-project-detail-requirement-overview-entry','button:project-detail:requirement-overview-entry','项目详情 / 需求纵览入口','按钮权限','进入','项目详情'),
 ('perm-button-project-edit-save','button:project-edit:save','项目编辑 / 保存项目','按钮权限','保存项目','项目编辑'),
+('perm-button-project-skus-save','button:project-skus:save','项目详情 / 保存 SKU','按钮权限','保存 SKU','项目详情'),
+('perm-button-project-skus-delete','button:project-skus:delete','项目详情 / 删除 SKU','按钮权限','删除 SKU','项目详情'),
 ('perm-button-tasks-create','button:tasks:create','任务管理 / 新建任务','按钮权限','新建任务','任务管理'),
 ('perm-button-tasks-save','button:tasks:save','任务管理 / 保存任务','按钮权限','保存任务','任务管理'),
 ('perm-button-task-detail-save','button:task-detail:save','任务详情 / 保存修改','按钮权限','保存修改','任务详情'),
@@ -103,6 +105,10 @@ INSERT INTO kpm_permissions (id, code, name, permission_type, target, location) 
 ('perm-button-order-types-edit','button:order-types:edit','订单类型配置 / 编辑','按钮权限','编辑','订单类型配置'),
 ('perm-button-order-types-toggle','button:order-types:toggle','订单类型配置 / 启用或停用','按钮权限','启用 / 停用','订单类型配置'),
 ('perm-button-order-types-delete','button:order-types:delete','订单类型配置 / 删除','按钮权限','删除','订单类型配置'),
+('perm-button-order-statuses-create','button:order-statuses:create','订单状态配置 / 新增','按钮权限','新增','订单状态配置'),
+('perm-button-order-statuses-edit','button:order-statuses:edit','订单状态配置 / 编辑','按钮权限','编辑','订单状态配置'),
+('perm-button-order-statuses-toggle','button:order-statuses:toggle','订单状态配置 / 启用或停用','按钮权限','启用 / 停用','订单状态配置'),
+('perm-button-order-statuses-delete','button:order-statuses:delete','订单状态配置 / 删除','按钮权限','删除','订单状态配置'),
 ('perm-button-task-statuses-create','button:task-statuses:create','任务状态配置 / 新增状态','按钮权限','新增状态','任务状态配置'),
 ('perm-button-task-statuses-edit','button:task-statuses:edit','任务状态配置 / 编辑状态','按钮权限','编辑状态','任务状态配置'),
 ('perm-button-task-statuses-toggle','button:task-statuses:toggle','任务状态配置 / 启用或停用','按钮权限','启用 / 停用','任务状态配置'),
@@ -124,18 +130,19 @@ INSERT INTO kpm_user_permissions (user_id, permission_id)
 SELECT 'user-chenchen', id FROM kpm_permissions WHERE code IN ('button:customers:create','button:customers:edit');
 
 INSERT INTO kpm_enum_items (id, enum_type, name, value, semantic, active, sort_order) VALUES
-('enum-project-status-1','project_status','未开始','未开始',NULL,true,10),('enum-project-status-2','project_status','进行中','进行中',NULL,true,20),('enum-project-status-3','project_status','已完成','已完成',NULL,true,30),
-('enum-stage-status-1','stage_status','未开始','未开始',NULL,true,10),('enum-stage-status-2','stage_status','进行中','进行中',NULL,true,20),('enum-stage-status-3','stage_status','已完成','已完成',NULL,true,30),
-('enum-salesability-1','salesability','可销售','可销售',NULL,true,10),('enum-salesability-2','salesability','不可销售','不可销售',NULL,true,20),
+('enum-project-status-1','project_status','未开始','未开始','DEFAULT',true,10),('enum-project-status-2','project_status','进行中','进行中','ACTIVE',true,20),('enum-project-status-3','project_status','已完成','已完成','COMPLETED',true,30),
+('enum-stage-status-1','stage_status','未开始','未开始','DEFAULT',true,10),('enum-stage-status-2','stage_status','进行中','进行中','ACTIVE',true,20),('enum-stage-status-3','stage_status','已完成','已完成','COMPLETED',true,30),
+('enum-salesability-1','salesability','可销售','可销售',NULL,true,10),('enum-salesability-2','salesability','不可销售','不可销售','DEFAULT',true,20),
 ('enum-unsellable-1','unsellable_reason','仍处于设计或测试阶段','仍处于设计或测试阶段',NULL,true,10),('enum-unsellable-2','unsellable_reason','产品过老，不再继续推广','产品过老，不再继续推广',NULL,true,20),('enum-unsellable-3','unsellable_reason','被遗弃的老项目','被遗弃的老项目',NULL,true,30),
-('enum-customer-status-1','customer_master_status','潜在客户','潜在客户',NULL,true,10),('enum-customer-status-2','customer_master_status','合作中','合作中',NULL,true,20),('enum-customer-status-3','customer_master_status','已停用','已停用',NULL,true,30),
-('enum-customer-project-1','customer_project_status','商机发掘','商机发掘',NULL,true,10),('enum-customer-project-2','customer_project_status','样机测试','样机测试',NULL,true,20),('enum-customer-project-3','customer_project_status','研发投入','研发投入',NULL,true,30),('enum-customer-project-4','customer_project_status','订单冲刺','订单冲刺',NULL,true,40),('enum-customer-project-5','customer_project_status','首单护航','首单护航',NULL,true,50),('enum-customer-project-6','customer_project_status','量产维护','量产维护',NULL,true,60),('enum-customer-project-7','customer_project_status','EOL 声明','EOL 声明',NULL,true,70),('enum-customer-project-8','customer_project_status','EOL','EOL',NULL,true,80),('enum-customer-project-9','customer_project_status','Support Ended','Support Ended',NULL,true,90),
-('enum-customer-level-1','customer_level','A / 战略客户','A / 战略客户',NULL,true,10),('enum-customer-level-2','customer_level','B / 重点客户','B / 重点客户',NULL,true,20),('enum-customer-level-3','customer_level','C / 普通客户','C / 普通客户',NULL,true,30),('enum-customer-level-4','customer_level','D / 观察客户','D / 观察客户',NULL,true,40),('enum-customer-level-5','customer_level','黑名单 / 暂停合作','黑名单 / 暂停合作',NULL,true,50),
-('enum-order-type-1','order_type','样品订单','样品订单',NULL,true,10),('enum-order-type-2','order_type','预订单','预订单',NULL,true,20),('enum-order-type-3','order_type','正式订单','正式订单',NULL,true,30),
-('enum-task-category-1','task_category','需求','需求',NULL,true,10),('enum-task-category-2','task_category','Bug','Bug',NULL,true,20),('enum-task-category-3','task_category','技术支持','技术支持',NULL,true,30),('enum-task-category-4','task_category','其他','其他',NULL,true,40),
-('enum-task-status-1','task_status','待处理','待处理','普通',true,10),('enum-task-status-2','task_status','进行中','进行中','普通',true,20),('enum-task-status-3','task_status','已完成','已完成','完成',true,30),('enum-task-status-4','task_status','已拒绝','已拒绝','拒绝',true,40),
-('enum-priority-1','priority','高','高',NULL,true,10),('enum-priority-2','priority','中','中',NULL,true,20),('enum-priority-3','priority','低','低',NULL,true,30),
-('enum-requirement-status-1','requirement_status','待评估','待评估',NULL,true,10),('enum-requirement-status-2','requirement_status','已采纳','已采纳',NULL,true,20),('enum-requirement-status-3','requirement_status','实现中','实现中',NULL,true,30),('enum-requirement-status-4','requirement_status','已实现','已实现','完成',true,40),('enum-requirement-status-5','requirement_status','已拒绝','已拒绝','拒绝',true,50),('enum-requirement-status-6','requirement_status','已作废','已作废',NULL,true,60),
+('enum-customer-status-1','customer_master_status','潜在客户','潜在客户','DEFAULT',true,10),('enum-customer-status-2','customer_master_status','合作中','合作中',NULL,true,20),('enum-customer-status-3','customer_master_status','已停用','已停用',NULL,true,30),
+('enum-customer-project-1','customer_project_status','商机发掘','商机发掘','DEFAULT',true,10),('enum-customer-project-2','customer_project_status','样机测试','样机测试',NULL,true,20),('enum-customer-project-3','customer_project_status','研发投入','研发投入',NULL,true,30),('enum-customer-project-4','customer_project_status','订单冲刺','订单冲刺',NULL,true,40),('enum-customer-project-5','customer_project_status','首单护航','首单护航',NULL,true,50),('enum-customer-project-6','customer_project_status','量产维护','量产维护',NULL,true,60),('enum-customer-project-7','customer_project_status','EOL 声明','EOL 声明',NULL,true,70),('enum-customer-project-8','customer_project_status','EOL','EOL',NULL,true,80),('enum-customer-project-9','customer_project_status','Support Ended','Support Ended',NULL,true,90),
+('enum-customer-level-1','customer_level','A / 战略客户','A / 战略客户',NULL,true,10),('enum-customer-level-2','customer_level','B / 重点客户','B / 重点客户',NULL,true,20),('enum-customer-level-3','customer_level','C / 普通客户','C / 普通客户','DEFAULT',true,30),('enum-customer-level-4','customer_level','D / 观察客户','D / 观察客户',NULL,true,40),('enum-customer-level-5','customer_level','黑名单 / 暂停合作','黑名单 / 暂停合作',NULL,true,50),
+('enum-order-type-1','order_type','样品订单','样品订单','样机测试',true,10),('enum-order-type-2','order_type','预订单','预订单','商机发掘',true,20),('enum-order-type-3','order_type','正式订单','正式订单','订单冲刺',true,30),
+('enum-order-status-1','order_status','已创建','已创建','DEFAULT',true,10),('enum-order-status-2','order_status','生产中','生产中','IN_PRODUCTION',true,20),('enum-order-status-3','order_status','已发货','已发货','SHIPPED',true,30),('enum-order-status-4','order_status','已收货','已收货','RECEIVED',true,40),('enum-order-status-5','order_status','已完成','已完成','COMPLETED',true,50),
+('enum-task-category-1','task_category','需求','需求','REQUIREMENT',true,10),('enum-task-category-2','task_category','Bug','Bug',NULL,true,20),('enum-task-category-3','task_category','技术支持','技术支持',NULL,true,30),('enum-task-category-4','task_category','其他','其他',NULL,true,40),
+('enum-task-status-1','task_status','待处理','待处理','DEFAULT',true,10),('enum-task-status-2','task_status','进行中','进行中','普通',true,20),('enum-task-status-3','task_status','已完成','已完成','完成',true,30),('enum-task-status-4','task_status','已拒绝','已拒绝','拒绝',true,40),
+('enum-priority-1','priority','高','高',NULL,true,10),('enum-priority-2','priority','中','中','DEFAULT',true,20),('enum-priority-3','priority','低','低',NULL,true,30),
+('enum-requirement-status-1','requirement_status','待评估','待评估','DEFAULT',true,10),('enum-requirement-status-2','requirement_status','已采纳','已采纳',NULL,true,20),('enum-requirement-status-3','requirement_status','实现中','实现中',NULL,true,30),('enum-requirement-status-4','requirement_status','已实现','已实现','完成',true,40),('enum-requirement-status-5','requirement_status','已拒绝','已拒绝','拒绝',true,50),('enum-requirement-status-6','requirement_status','已作废','已作废','VOID',true,60),
 ('enum-currency-1','currency','USD','USD',NULL,true,10),('enum-currency-2','currency','EUR','EUR',NULL,true,20),('enum-currency-3','currency','CNY','CNY',NULL,true,30);
 
 INSERT INTO kpm_task_status_transitions (id, from_status, to_status) VALUES
@@ -152,6 +159,12 @@ INSERT INTO kpm_projects (id, external_name, internal_name, model_name, manager_
 ('s6-mini','S6 mini','R2290','K1290','user-zhouhang','zhouhang@kozenmobile.com','进行中',false,'不可销售','仍处于设计或测试阶段','轻量级移动收银终端。'),
 ('x10-pro','X10 Pro','R2410','K1410','user-liuyang','liuyang@kozenmobile.com','已完成',true,'不可销售','产品过老，不再继续推广','高端桌面式 POS 设备。'),
 ('m5-plus','M5 Plus','R2510','K1510','user-hejing','hejing@kozenmobile.com','进行中',false,'可销售',NULL,'已完成设计测试并进入客户推广的移动 POS。');
+
+INSERT INTO kpm_project_skus (id, project_id, whole_machine_part_number, configuration_name, memory_type, active) VALUES
+('sku-p8-dual-4-64','p8-dual','K1352-4G64G-DUAL','P8 dual / 4GB+64GB / 双屏','LPDDR4 + eMMC',true),
+('sku-p8-dual-6-128','p8-dual','K1352-6G128G-DUAL','P8 dual / 6GB+128GB / 双屏','LPDDR4X + UFS',true),
+('sku-m5-plus-4-64','m5-plus','K1510-4G64G-MOB','M5 Plus / 4GB+64GB / 移动版','LPDDR4 + eMMC',true),
+('sku-x10-pro-8-128','x10-pro','K1410-8G128G-DESK','X10 Pro / 8GB+128GB / 桌面旗舰版','LPDDR4X + UFS',true);
 
 INSERT INTO kpm_project_members (id, project_id, user_id, user_account, role_name) VALUES
 ('pm-p8-1','p8-dual','user-wangwei','wangwei@kozenmobile.com','硬件项目经理'),('pm-p8-2','p8-dual','user-lina','lina@kozenmobile.com','软件项目经理'),('pm-p8-3','p8-dual','user-chenchen','chenchen@kozenmobile.com','技术支持'),('pm-p8-4','p8-dual','user-zhaolei','zhaolei@kozenmobile.com','销售'),
@@ -214,13 +227,13 @@ INSERT INTO kpm_task_participants (task_id, user_id, participant_name) VALUES ('
 INSERT INTO kpm_task_attachments (id, task_id, file_name, file_type, file_size, uploader, uploaded_at) VALUES ('ta-101-1','KPM-101','支付语言包说明.pdf','PDF','860 KB','李娜','2026-05-16 10:20');
 INSERT INTO kpm_task_comments (id, task_id, author, content, attachments, created_at) VALUES ('tc-101-1','KPM-101','李娜','英语文案已确认，今天补齐德国版特殊字段。','[]','2026-05-17 09:10'),('tc-104-1','KPM-104','陈晨','已完成第一轮现场排查，等待销售确认下一步推进计划。','[]','2026-05-16 09:30');
 
-INSERT INTO kpm_orders (id, order_date, customer_id, project_id, order_type, quantity, specification, expected_ship_date, planned_ship_date, software_version, currency, unit_price, amount, creator_user_id, creator) VALUES
-('ORD-202601-002','2026-01-16','cus-nova','m5-plus','正式订单',90,'4GB + 64GB / 欧规充电器 / 黑色','2026-02-12','2026-02-10','v3.0.0','USD',166,14940,'user-zhaolei','赵磊'),
-('ORD-202602-004','2026-02-21','cus-siam','p8-dual','样品订单',80,'双屏 / 泰语键盘膜 / 银色','2026-03-18','2026-03-20','v2.6.0','USD',232,18560,'user-gaojing','高静'),
-('ORD-202603-006','2026-03-10','cus-nova','m5-plus','正式订单',120,'4GB + 64GB / 欧规充电器 / 黑色','2026-04-08','2026-04-06','v3.1.0','USD',167,20040,'user-zhaolei','赵磊'),
-('ORD-202605-001','2026-05-02','cus-nova','m5-plus','正式订单',180,'4GB + 64GB / 欧规充电器 / 黑色','2026-06-05','2026-06-03','v3.2.1','USD',168,30240,'user-zhaolei','赵磊'),
-('ORD-202604-008','2026-04-18','cus-siam','p8-dual','预订单',120,'双屏 / 泰语键盘膜 / 银色','2026-05-28','2026-05-30','v2.8.0-beta','USD',236,28320,'user-gaojing','高静'),
-('ORD-202605-011','2026-05-11','cus-siam','p8-dual','正式订单',140,'双屏 / 泰语键盘膜 / 银色','2026-06-08','2026-06-10','v2.8.1','USD',238,33320,'user-gaojing','高静'),
-('ORD-202503-014','2025-03-12','cus-nova','x10-pro','正式订单',60,'桌面旗舰版 / NFC / 德语包','2025-04-10','2025-04-08','v5.1.4','EUR',320,19200,'user-zhaolei','赵磊');
+INSERT INTO kpm_orders (id, order_date, customer_id, project_id, sku_id, sku_snapshot, order_type, status, quantity, specification, expected_ship_date, planned_ship_date, actual_ship_date, software_version, currency, unit_price, amount, creator_user_id, creator) VALUES
+('ORD-202601-002','2026-01-16','cus-nova','m5-plus','sku-m5-plus-4-64','{"wholeMachinePartNumber":"K1510-4G64G-MOB","configurationName":"M5 Plus / 4GB+64GB / 移动版","memoryType":"LPDDR4 + eMMC"}','正式订单','已完成',90,'欧规充电器 / 黑色','2026-02-12','2026-02-10','2026-02-10','v3.0.0','USD',166,14940,'user-zhaolei','赵磊'),
+('ORD-202602-004','2026-02-21','cus-siam','p8-dual','sku-p8-dual-4-64','{"wholeMachinePartNumber":"K1352-4G64G-DUAL","configurationName":"P8 dual / 4GB+64GB / 双屏","memoryType":"LPDDR4 + eMMC"}','样品订单','已收货',80,'泰语键盘膜 / 银色','2026-03-18','2026-03-20','2026-03-20','v2.6.0','USD',232,18560,'user-gaojing','高静'),
+('ORD-202603-006','2026-03-10','cus-nova','m5-plus','sku-m5-plus-4-64','{"wholeMachinePartNumber":"K1510-4G64G-MOB","configurationName":"M5 Plus / 4GB+64GB / 移动版","memoryType":"LPDDR4 + eMMC"}','正式订单','已完成',120,'欧规充电器 / 黑色','2026-04-08','2026-04-06','2026-04-06','v3.1.0','USD',167,20040,'user-zhaolei','赵磊'),
+('ORD-202605-001','2026-05-02','cus-nova','m5-plus','sku-m5-plus-4-64','{"wholeMachinePartNumber":"K1510-4G64G-MOB","configurationName":"M5 Plus / 4GB+64GB / 移动版","memoryType":"LPDDR4 + eMMC"}','正式订单','生产中',180,'欧规充电器 / 黑色','2026-06-05','2026-06-03',NULL,'v3.2.1','USD',168,30240,'user-zhaolei','赵磊'),
+('ORD-202604-008','2026-04-18','cus-siam','p8-dual','sku-p8-dual-4-64','{"wholeMachinePartNumber":"K1352-4G64G-DUAL","configurationName":"P8 dual / 4GB+64GB / 双屏","memoryType":"LPDDR4 + eMMC"}','预订单','已创建',120,'泰语键盘膜 / 银色','2026-05-28','2026-05-30',NULL,'v2.8.0-beta','USD',236,28320,'user-gaojing','高静'),
+('ORD-202605-011','2026-05-11','cus-siam','p8-dual','sku-p8-dual-6-128','{"wholeMachinePartNumber":"K1352-6G128G-DUAL","configurationName":"P8 dual / 6GB+128GB / 双屏","memoryType":"LPDDR4X + UFS"}','正式订单','已创建',140,'泰语键盘膜 / 银色','2026-06-08','2026-06-10',NULL,'v2.8.1','USD',238,33320,'user-gaojing','高静'),
+('ORD-202503-014','2025-03-12','cus-nova','x10-pro','sku-x10-pro-8-128','{"wholeMachinePartNumber":"K1410-8G128G-DESK","configurationName":"X10 Pro / 8GB+128GB / 桌面旗舰版","memoryType":"LPDDR4X + UFS"}','正式订单','已完成',60,'NFC / 德语包','2025-04-10','2025-04-08','2025-04-08','v5.1.4','EUR',320,19200,'user-zhaolei','赵磊');
 INSERT INTO kpm_order_histories (id, order_id, modifier, modified_at, changes, reason) VALUES
 ('oh-202605-001-1','ORD-202605-001','张敏','2026-05-06 14:20','计划发货日期：2026-06-01 → 2026-06-03','客户要求与门店开业时间对齐');

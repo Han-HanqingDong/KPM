@@ -1,12 +1,14 @@
 package com.kozen.kpm.customer.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 import java.util.List;
 
 @Schema(description = "客户跟进记录保存请求")
 public record CustomerFollowupRequest(
+        @NotBlank(message = "作者不能为空")
         @Size(max = 64, message = "作者不能超过64个字符")
         String author,
         @Size(max = 2000, message = "跟进内容不能超过2000个字符")

@@ -51,6 +51,11 @@ public class NotificationServiceImpl implements NotificationService {
         }
     }
 
+    @Scheduled(cron = "${kpm.notification.read-retention-cleanup-cron:0 20 3 * * *}")
+    public void cleanupExpiredReadMessages() {
+        notificationMapper.cleanupExpiredReadMessages();
+    }
+
     @Override
     public List<InternalMessageDto> messages(String account, boolean unreadOnly) {
         return notificationMapper.messages(currentUserId(account), unreadOnly).stream()

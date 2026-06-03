@@ -8,6 +8,7 @@ import com.kozen.kpm.project.dto.ProcessTemplateRequest;
 import com.kozen.kpm.project.dto.ProjectCustomerStatusRequest;
 import com.kozen.kpm.project.dto.ProjectMembersRequest;
 import com.kozen.kpm.project.dto.ProjectRequest;
+import com.kozen.kpm.project.dto.ProjectSkuRequest;
 import com.kozen.kpm.project.dto.RequirementRequest;
 import com.kozen.kpm.project.dto.StageRecordRequest;
 import com.kozen.kpm.project.dto.StageStatusRequest;
@@ -73,6 +74,37 @@ public class ProjectApiController {
     @Operation(summary = "替换项目成员", description = "弹窗维护项目成员时保存完整成员列表。")
     public ApiResponse<Map<String, Object>> replaceMembers(@PathVariable String id, @Valid @RequestBody ProjectMembersRequest request) {
         return ApiResponse.ok(projectService.replaceMembers(id, request));
+    }
+
+    @GetMapping("/{id}/skus")
+    @Operation(summary = "查询项目 SKU", description = "查询项目下可用于订单选择的 SKU 配置。")
+    public ApiResponse<List<Map<String, Object>>> skus(@PathVariable String id) {
+        return ApiResponse.ok(projectService.skus(id));
+    }
+
+    @PostMapping("/{id}/skus")
+    @Operation(summary = "新增项目 SKU", description = "维护项目下单时可选择的 SKU 主数据。")
+    public ApiResponse<Map<String, Object>> createSku(@PathVariable String id,
+                                                      @Valid @RequestBody ProjectSkuRequest request,
+                                                      @RequestHeader(value = "X-KPM-Account", required = false) String operator) {
+        return ApiResponse.ok(projectService.createSku(id, request, operator));
+    }
+
+    @PutMapping("/{id}/skus/{skuId}")
+    @Operation(summary = "修改项目 SKU", description = "修改整机料号、配置名称、内存类型或启用状态。")
+    public ApiResponse<Map<String, Object>> updateSku(@PathVariable String id,
+                                                      @PathVariable String skuId,
+                                                      @Valid @RequestBody ProjectSkuRequest request,
+                                                      @RequestHeader(value = "X-KPM-Account", required = false) String operator) {
+        return ApiResponse.ok(projectService.updateSku(id, skuId, request, operator));
+    }
+
+    @DeleteMapping("/{id}/skus/{skuId}")
+    @Operation(summary = "删除项目 SKU", description = "逻辑删除项目 SKU；历史订单快照不受影响。")
+    public ApiResponse<Boolean> deleteSku(@PathVariable String id,
+                                          @PathVariable String skuId,
+                                          @RequestHeader(value = "X-KPM-Account", required = false) String operator) {
+        return ApiResponse.ok(projectService.deleteSku(id, skuId, operator));
     }
 
     @PostMapping("/{projectId}/customers")

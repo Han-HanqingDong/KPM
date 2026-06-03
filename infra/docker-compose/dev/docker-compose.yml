@@ -1,19 +1,46 @@
 name: kpm-dev
 
+x-backend-env: &backend-env
+  image: eclipse-temurin:21-jre-alpine
+  env_file:
+    - ../../../.env
+  environment:
+    KPM_DB_HOST: postgres
+    KPM_DB_PORT: 5432
+    KPM_NACOS_ADDR: nacos:8848
+    KPM_NACOS_ENABLED: ${KPM_NACOS_ENABLED:-true}
+    KPM_NACOS_CONFIG_ENABLED: ${KPM_NACOS_CONFIG_ENABLED:-true}
+    KPM_AUTH_ENABLED: ${KPM_AUTH_ENABLED:-true}
+    KPM_RBAC_ENABLED: ${KPM_RBAC_ENABLED:-true}
+    KPM_AUTH_TOKEN_SECRET: ${KPM_AUTH_TOKEN_SECRET:-kpm-local-dev-secret-change-me}
+  volumes:
+    - ../../../apps/backend:/workspace
+    - ../../../.m2:/root/.m2
+  working_dir: /workspace
+  depends_on:
+    postgres:
+      condition: service_healthy
+    nacos-config-publisher:
+      condition: service_completed_successfully
+    backend-builder:
+      condition: service_completed_successfully
+
 services:
   postgres:
     image: postgres:18
     container_name: kpm-postgres
+    env_file:
+      - ../../../.env
     environment:
-      POSTGRES_DB: kpm
-      POSTGRES_USER: kpm
-      POSTGRES_PASSWORD: kpm_dev_password
+      POSTGRES_DB: ${KPM_DB_NAME:-kpm}
+      POSTGRES_USER: ${KPM_DB_USER:-kpm}
+      POSTGRES_PASSWORD: ${KPM_DB_PASSWORD:-kpm_dev_password}
     ports:
-      - "5432:5432"
+      - "${KPM_DB_PORT:-5432}:5432"
     volumes:
       - kpm-postgres-data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kpm -d kpm"]
+      test: ["CMD-SHELL", "pg_isready -U ${KPM_DB_USER:-kpm} -d ${KPM_DB_NAME:-kpm}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -22,7 +49,7 @@ services:
     image: valkey/valkey:8-alpine
     container_name: kpm-valkey
     ports:
-      - "6379:6379"
+      - "${KPM_VALKEY_PORT:-6379}:6379"
     volumes:
       - kpm-valkey-data:/data
     healthcheck:
@@ -34,26 +61,208 @@ services:
   nacos:
     image: nacos/nacos-server:v3.1.1
     container_name: kpm-nacos
+    env_file:
+      - ../../../.env
     environment:
       MODE: standalone
       NACOS_AUTH_ENABLE: "false"
       NACOS_AUTH_TOKEN: "S1BNLURldi1Mb2NhbC1OYWNvcy1BdXRoLVRva2VuLTEyMzQ1Njc4OTA="
       NACOS_AUTH_IDENTITY_KEY: "kpm-dev"
       NACOS_AUTH_IDENTITY_VALUE: "kpm-dev-local"
-      JVM_XMS: 64m
-      JVM_XMX: 128m
-      JVM_XMN: 32m
+      JVM_XMS: ${KPM_NACOS_JVM_XMS:-128m}
+      JVM_XMX: ${KPM_NACOS_JVM_XMX:-512m}
+      JVM_XMN: ${KPM_NACOS_JVM_XMN:-64m}
     ports:
-      - "8848:8848"
-      - "8849:8080"
-      - "9848:9848"
+      - "${KPM_NACOS_PORT:-8848}:8848"
+      - "${KPM_NACOS_CONSOLE_PORT:-8849}:8080"
+      - "${KPM_NACOS_GRPC_PORT:-9848}:9848"
     volumes:
-      - kpm-nacos-data:/home/nacos/data
+      - ../../../.local/nacos/data:/home/nacos/data
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8848/nacos/v3/admin/core/state || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 10
+
+  backend-builder:
+    image: maven:3.9.11-eclipse-temurin-21
+    container_name: kpm-backend-builder
+    env_file:
+      - ../../../.env
+    volumes:
+      - ../../../apps/backend:/workspace
+      - ../../../.m2:/root/.m2
+    working_dir: /workspace
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+    command: mvn -q -DskipTests package
+
+  nacos-config-publisher:
+    image: alpine:3.22
+    container_name: kpm-nacos-config-publisher
+    env_file:
+      - ../../../.env
+    environment:
+      KPM_NACOS_ADDR: nacos:8848
+      KPM_DB_HOST: postgres
+      KPM_DB_PORT: 5432
+      KPM_DB_NAME: ${KPM_DB_NAME:-kpm}
+      KPM_DB_USER: ${KPM_DB_USER:-kpm}
+      KPM_DB_PASSWORD: ${KPM_DB_PASSWORD:-kpm_dev_password}
+      KPM_AUTH_TOKEN_SECRET: ${KPM_AUTH_TOKEN_SECRET:-kpm-local-dev-secret-change-me}
+      KPM_IAM_URI: http://iam-service:8101
+    volumes:
+      - ../../../:/workspace
+    working_dir: /workspace
+    depends_on:
+      nacos:
+        condition: service_healthy
+    command: sh -lc "apk add --no-cache bash curl >/dev/null && bash scripts/nacos-publish-service-configs.sh"
+
+  iam-service:
+    <<: *backend-env
+    container_name: kpm-iam-service
+    ports:
+      - "${KPM_IAM_PORT:-8101}:8101"
+    command: java -jar kpm-iam-service/target/kpm-iam-service-0.1.0-SNAPSHOT.jar
+
+  resource-service:
+    <<: *backend-env
+    container_name: kpm-resource-service
+    ports:
+      - "${KPM_RESOURCE_PORT:-8102}:8102"
+    command: java -jar kpm-resource-service/target/kpm-resource-service-0.1.0-SNAPSHOT.jar
+
+  project-service:
+    <<: *backend-env
+    container_name: kpm-project-service
+    ports:
+      - "${KPM_PROJECT_PORT:-8103}:8103"
+    command: java -jar kpm-project-service/target/kpm-project-service-0.1.0-SNAPSHOT.jar
+
+  customer-service:
+    <<: *backend-env
+    container_name: kpm-customer-service
+    ports:
+      - "${KPM_CUSTOMER_PORT:-8104}:8104"
+    command: java -jar kpm-customer-service/target/kpm-customer-service-0.1.0-SNAPSHOT.jar
+
+  task-service:
+    <<: *backend-env
+    container_name: kpm-task-service
+    ports:
+      - "${KPM_TASK_PORT:-8105}:8105"
+    command: java -jar kpm-task-service/target/kpm-task-service-0.1.0-SNAPSHOT.jar
+
+  order-service:
+    <<: *backend-env
+    container_name: kpm-order-service
+    ports:
+      - "${KPM_ORDER_PORT:-8106}:8106"
+    command: java -jar kpm-order-service/target/kpm-order-service-0.1.0-SNAPSHOT.jar
+
+  file-service:
+    <<: *backend-env
+    container_name: kpm-file-service
+    ports:
+      - "${KPM_FILE_PORT:-8107}:8107"
+    environment:
+      KPM_DB_HOST: postgres
+      KPM_DB_PORT: 5432
+      KPM_DB_NAME: ${KPM_DB_NAME:-kpm}
+      KPM_DB_USER: ${KPM_DB_USER:-kpm}
+      KPM_DB_PASSWORD: ${KPM_DB_PASSWORD:-kpm_dev_password}
+      KPM_NACOS_ADDR: nacos:8848
+      KPM_NACOS_ENABLED: ${KPM_NACOS_ENABLED:-true}
+      KPM_NACOS_CONFIG_ENABLED: ${KPM_NACOS_CONFIG_ENABLED:-true}
+      KPM_NACOS_NAMESPACE: ${KPM_NACOS_NAMESPACE:-public}
+      KPM_NACOS_CONFIG_GROUP: ${KPM_NACOS_CONFIG_GROUP:-DEFAULT_GROUP}
+      KPM_AUTH_ENABLED: ${KPM_AUTH_ENABLED:-true}
+      KPM_RBAC_ENABLED: ${KPM_RBAC_ENABLED:-true}
+      KPM_AUTH_TOKEN_SECRET: ${KPM_AUTH_TOKEN_SECRET:-kpm-local-dev-secret-change-me}
+      KPM_UPLOAD_MAX_FILE_SIZE: ${KPM_UPLOAD_MAX_FILE_SIZE:-200MB}
+      KPM_UPLOAD_MAX_REQUEST_SIZE: ${KPM_UPLOAD_MAX_REQUEST_SIZE:-500MB}
+    command: java -jar kpm-file-service/target/kpm-file-service-0.1.0-SNAPSHOT.jar
+
+  analytics-service:
+    <<: *backend-env
+    container_name: kpm-analytics-service
+    ports:
+      - "${KPM_ANALYTICS_PORT:-8108}:8108"
+    command: java -jar kpm-analytics-service/target/kpm-analytics-service-0.1.0-SNAPSHOT.jar
+
+  integration-service:
+    <<: *backend-env
+    container_name: kpm-integration-service
+    ports:
+      - "${KPM_INTEGRATION_PORT:-8109}:8109"
+    command: java -jar kpm-integration-service/target/kpm-integration-service-0.1.0-SNAPSHOT.jar
+
+  notification-service:
+    <<: *backend-env
+    container_name: kpm-notification-service
+    ports:
+      - "${KPM_NOTIFICATION_PORT:-8110}:8110"
+    environment:
+      KPM_DB_HOST: postgres
+      KPM_DB_PORT: 5432
+      KPM_DB_NAME: ${KPM_DB_NAME:-kpm}
+      KPM_DB_USER: ${KPM_DB_USER:-kpm}
+      KPM_DB_PASSWORD: ${KPM_DB_PASSWORD:-kpm_dev_password}
+      KPM_NACOS_ADDR: nacos:8848
+      KPM_NACOS_ENABLED: ${KPM_NACOS_ENABLED:-true}
+      KPM_NACOS_CONFIG_ENABLED: ${KPM_NACOS_CONFIG_ENABLED:-true}
+      KPM_NACOS_NAMESPACE: ${KPM_NACOS_NAMESPACE:-public}
+      KPM_NACOS_CONFIG_GROUP: ${KPM_NACOS_CONFIG_GROUP:-DEFAULT_GROUP}
+      KPM_AUTH_ENABLED: ${KPM_AUTH_ENABLED:-true}
+      KPM_RBAC_ENABLED: ${KPM_RBAC_ENABLED:-true}
+      KPM_AUTH_TOKEN_SECRET: ${KPM_AUTH_TOKEN_SECRET:-kpm-local-dev-secret-change-me}
+      KPM_NOTIFICATION_REFRESH_INTERVAL_SECONDS: ${KPM_NOTIFICATION_REFRESH_INTERVAL_SECONDS:-120}
+      KPM_NOTIFICATION_PROCESSOR_INTERVAL_MS: ${KPM_NOTIFICATION_PROCESSOR_INTERVAL_MS:-15000}
+      KPM_NOTIFICATION_MAIL_ENABLED: ${KPM_NOTIFICATION_MAIL_ENABLED:-false}
+      KPM_NOTIFICATION_MAIL_FROM: ${KPM_NOTIFICATION_MAIL_FROM:-noreply@kozen.example}
+      KPM_MAIL_HOST: ${KPM_MAIL_HOST:-}
+      KPM_MAIL_PORT: ${KPM_MAIL_PORT:-587}
+      KPM_MAIL_USERNAME: ${KPM_MAIL_USERNAME:-}
+      KPM_MAIL_PASSWORD: ${KPM_MAIL_PASSWORD:-}
+      KPM_MAIL_SMTP_AUTH: ${KPM_MAIL_SMTP_AUTH:-true}
+      KPM_MAIL_STARTTLS_ENABLE: ${KPM_MAIL_STARTTLS_ENABLE:-true}
+    command: java -jar kpm-notification-service/target/kpm-notification-service-0.1.0-SNAPSHOT.jar
+
+  gateway:
+    <<: *backend-env
+    container_name: kpm-gateway
+    ports:
+      - "${KPM_GATEWAY_PORT:-8080}:8080"
+    environment:
+      KPM_NACOS_ADDR: nacos:8848
+      KPM_NACOS_ENABLED: ${KPM_NACOS_ENABLED:-true}
+      KPM_NACOS_CONFIG_ENABLED: ${KPM_NACOS_CONFIG_ENABLED:-true}
+      KPM_NACOS_NAMESPACE: ${KPM_NACOS_NAMESPACE:-public}
+      KPM_NACOS_CONFIG_GROUP: ${KPM_NACOS_CONFIG_GROUP:-DEFAULT_GROUP}
+      KPM_IAM_URI: http://iam-service:8101
+      KPM_AUTH_ENABLED: ${KPM_AUTH_ENABLED:-true}
+      KPM_RBAC_ENABLED: ${KPM_RBAC_ENABLED:-true}
+      KPM_AUTH_TOKEN_SECRET: ${KPM_AUTH_TOKEN_SECRET:-kpm-local-dev-secret-change-me}
+    command: java -jar kpm-gateway/target/kpm-gateway-0.1.0-SNAPSHOT.jar
+
+  frontend:
+    image: node:24-alpine
+    container_name: kpm-frontend
+    env_file:
+      - ../../../.env
+    working_dir: /workspace
+    volumes:
+      - ../../../apps/frontend/kpm-web:/workspace
+    ports:
+      - "${KPM_FRONTEND_PORT:-4173}:4173"
+    command: sh -lc "npm install && npm run build && npm run preview -- --host 0.0.0.0 --port 4173"
+    depends_on:
+      gateway:
+        condition: service_started
 
   rocketmq-namesrv:
     image: apache/rocketmq:5.3.1
@@ -79,4 +288,3 @@ services:
 volumes:
   kpm-postgres-data:
   kpm-valkey-data:
-  kpm-nacos-data:

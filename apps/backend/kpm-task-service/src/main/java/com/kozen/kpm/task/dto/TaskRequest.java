@@ -58,9 +58,9 @@ public record TaskRequest(
         map.put("projectId", projectId);
         map.put("stageId", stageId);
         map.put("customerId", customerId);
-        map.put("category", category == null || category.isBlank() ? "其他" : category);
-        map.put("status", status == null || status.isBlank() ? "待处理" : status);
-        map.put("priority", priority == null || priority.isBlank() ? "中" : priority);
+        map.put("category", category);
+        map.put("status", status);
+        map.put("priority", priority);
         map.put("creator", creator);
         map.put("expectedCompletionAt", expectedCompletionAt == null || expectedCompletionAt.isBlank() ? null : expectedCompletionAt);
         map.put("dueDate", dueDate == null || dueDate.isBlank() ? null : dueDate);

@@ -24,10 +24,10 @@ public class AnalyticsServiceImpl implements AnalyticsService {
     @Override
     public Map<String, Object> dashboard() {
         Map<String, Object> data = new LinkedHashMap<>();
-        data.put("projectCount", analyticsMapper.intValue("select count(*) from kpm_projects"));
-        data.put("activeProjectCount", analyticsMapper.intValue("select count(*) from kpm_projects where status='进行中'"));
-        data.put("customerCount", analyticsMapper.intValue("select count(*) from kpm_customers"));
-        data.put("openTaskCount", analyticsMapper.intValue("select count(*) from kpm_tasks where status not in ('已完成','已拒绝')"));
+        data.put("projectCount", analyticsMapper.projectCount());
+        data.put("activeProjectCount", analyticsMapper.activeProjectCount());
+        data.put("customerCount", analyticsMapper.customerCount());
+        data.put("openTaskCount", analyticsMapper.openTaskCount());
         return data;
     }
 

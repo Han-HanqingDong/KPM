@@ -35,11 +35,11 @@ public record CustomerRequest(
     public Map<String, Object> toMap() {
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("name", name);
-        map.put("shortName", shortName == null || shortName.isBlank() ? "-" : shortName.trim());
+        map.put("shortName", shortName == null || shortName.isBlank() ? null : shortName.trim());
         map.put("region", region);
         map.put("address", address);
-        map.put("level", level == null || level.isBlank() ? "C / 普通客户" : level);
-        map.put("status", status == null || status.isBlank() ? "潜在客户" : status);
+        map.put("level", level);
+        map.put("status", status);
         map.put("salesOwners", safeSalesOwners());
         map.put("supportOwners", safeSupportOwners());
         return map;

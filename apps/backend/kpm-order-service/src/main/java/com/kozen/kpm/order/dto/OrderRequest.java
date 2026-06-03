@@ -24,16 +24,22 @@ public record OrderRequest(
         @NotBlank(message = "项目ID不能为空")
         @Size(max = 80, message = "项目ID不能超过80个字符")
         String projectId,
+        @NotBlank(message = "SKU不能为空")
+        @Size(max = 80, message = "SKU ID不能超过80个字符")
+        String skuId,
         @NotBlank(message = "订单类型不能为空")
         @Size(max = 40, message = "订单类型不能超过40个字符")
         String orderType,
+        @Size(max = 40, message = "订单状态不能超过40个字符")
+        String status,
         @NotNull(message = "数量不能为空")
         @Positive(message = "数量必须大于0")
         Integer quantity,
         @NotBlank(message = "具体规格不能为空")
         @Size(max = 1000, message = "具体规格不能超过1000个字符")
         String specification,
-        @Pattern(regexp = "^$|\\d{4}-\\d{2}-\\d{2}$", message = "期望发货日期必须是YYYY-MM-DD格式")
+        @NotBlank(message = "期望发货日期不能为空")
+        @Pattern(regexp = "\\d{4}-\\d{2}-\\d{2}", message = "期望发货日期必须是YYYY-MM-DD格式")
         String expectedShipDate,
         @Pattern(regexp = "^$|\\d{4}-\\d{2}-\\d{2}$", message = "计划发货日期必须是YYYY-MM-DD格式")
         String plannedShipDate,
@@ -57,8 +63,9 @@ public record OrderRequest(
 ) {
     public String safeExpectedShipDate() { return expectedShipDate == null || expectedShipDate.isBlank() ? null : expectedShipDate; }
     public String safePlannedShipDate() { return plannedShipDate == null || plannedShipDate.isBlank() ? null : plannedShipDate; }
-    public String safeCurrency() { return currency == null || currency.isBlank() ? "USD" : currency; }
-    public String safeOrderType() { return orderType == null || orderType.isBlank() ? "正式订单" : orderType; }
+    public String safeCurrency() { return currency; }
+    public String safeOrderType() { return orderType; }
+    public String safeStatus() { return status == null || status.isBlank() ? null : status; }
 
     public Map<String, Object> toMap() {
         Map<String, Object> map = new LinkedHashMap<>();
@@ -66,7 +73,9 @@ public record OrderRequest(
         map.put("orderDate", orderDate);
         map.put("customerId", customerId);
         map.put("projectId", projectId);
+        map.put("skuId", skuId);
         map.put("orderType", safeOrderType());
+        map.put("status", safeStatus());
         map.put("quantity", quantity);
         map.put("specification", specification);
         map.put("expectedShipDate", safeExpectedShipDate());

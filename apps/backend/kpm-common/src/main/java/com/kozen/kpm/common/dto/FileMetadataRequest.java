@@ -16,12 +16,16 @@ public record FileMetadataRequest(
         String fileType,
         @Size(max = 64, message = "文件大小不能超过64个字符")
         String fileSize,
+        @NotBlank(message = "上传人不能为空")
         @Size(max = 64, message = "上传人不能超过64个字符")
         String uploader,
+        @NotBlank(message = "Bucket不能为空")
         @Size(max = 128, message = "Bucket不能超过128个字符")
         String bucket,
+        @NotBlank(message = "对象路径不能为空")
         @Size(max = 512, message = "对象路径不能超过512个字符")
         String objectKey,
+        @NotBlank(message = "存储地址不能为空")
         @Size(max = 1024, message = "存储地址不能超过1024个字符")
         String storageUrl,
         @Size(max = 80, message = "文件分类不能超过80个字符")

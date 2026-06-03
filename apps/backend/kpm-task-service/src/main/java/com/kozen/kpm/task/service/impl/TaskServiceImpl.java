@@ -4,6 +4,7 @@ import com.kozen.kpm.common.dto.FileMetadataRequest;
 import com.kozen.kpm.common.util.IdUtil;
 import com.kozen.kpm.common.util.JsonUtil;
 import com.kozen.kpm.common.util.SqlParamUtil;
+import com.kozen.kpm.common.util.ValidationUtil;
 import com.kozen.kpm.task.dto.TaskCommentRequest;
 import com.kozen.kpm.task.dto.TaskRequest;
 import com.kozen.kpm.task.mapper.TaskMapper;
@@ -65,7 +66,7 @@ public class TaskServiceImpl implements TaskService {
         if (!hasText && !hasFiles) {
             throw new IllegalArgumentException("评论内容或附件不能为空");
         }
-        String author = request.author() == null || request.author().isBlank() ? "张敏" : request.author();
+        String author = ValidationUtil.requireText(request.author(), "评论作者", 64);
         taskMapper.insertComment(IdUtil.nanoId("tc"), id, author, request.content(), request.safeAttachments());
         return detail(id);
     }
@@ -128,8 +129,14 @@ public class TaskServiceImpl implements TaskService {
     }
 
     private void syncRequirementByTaskStatus(String taskId, String status) {
-        if ("已完成".equals(status)) taskMapper.syncRequirement(taskId, "已实现");
-        else if ("已拒绝".equals(status)) taskMapper.syncRequirement(taskId, "已拒绝");
+        String semantic = taskMapper.enumSemantic("task_status", status);
+        if ("完成".equals(semantic) || "拒绝".equals(semantic)) {
+            String requirementStatus = taskMapper.enumValueBySemantic("requirement_status", semantic);
+            if (requirementStatus == null || requirementStatus.isBlank()) {
+                throw new IllegalArgumentException("需求状态未配置语义：" + semantic);
+            }
+            taskMapper.syncRequirement(taskId, requirementStatus);
+        }
     }
 
     private String nextTaskId() {

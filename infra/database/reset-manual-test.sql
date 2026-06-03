@@ -25,9 +25,12 @@ TRUNCATE TABLE
   kpm_stage_assignees,
   kpm_project_stages,
   kpm_project_members,
+  kpm_project_skus,
   kpm_projects,
   kpm_prototype_snapshots,
-  kpm_geocode_cache
+  kpm_geocode_cache,
+  kpm_internal_messages,
+  kpm_notification_events
 RESTART IDENTITY CASCADE;
 
 TRUNCATE TABLE
