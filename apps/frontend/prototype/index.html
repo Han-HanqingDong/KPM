@@ -42,7 +42,23 @@
     <aside class="sidebar">
       <button id="sidebar-toggle" class="sidebar-toggle" type="button" title="收起 / 展开菜单">☰</button>
       <div class="brand">
-        <div class="brand-mark kozen-logo"><span>K</span></div>
+        <div class="brand-mark kozen-logo" aria-label="KOZEN">
+          <svg viewBox="0 0 48 48" role="img" aria-hidden="true">
+            <defs>
+              <linearGradient id="kozenLogoGradient" x1="8" x2="40" y1="6" y2="42" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#FFF35A" />
+                <stop offset="0.62" stop-color="#FFE900" />
+                <stop offset="1" stop-color="#B7FF38" />
+              </linearGradient>
+            </defs>
+            <rect x="3" y="3" width="42" height="42" rx="14" fill="url(#kozenLogoGradient)" />
+            <path d="M16 13v22" stroke="#101828" stroke-width="5" stroke-linecap="round" />
+            <path d="M20 24 33 13" stroke="#101828" stroke-width="5" stroke-linecap="round" />
+            <path d="M21 25 35 36" stroke="#101828" stroke-width="5" stroke-linecap="round" />
+            <path d="M10 36c8 5 23 4 31-6" stroke="#101828" stroke-width="2.6" stroke-linecap="round" opacity=".35" />
+            <circle cx="36" cy="12" r="3.2" fill="#101828" />
+          </svg>
+        </div>
         <div>
           <strong>KPM</strong>
           <span data-i18n="brand.subtitle">Kozen Project Management</span>
@@ -63,6 +79,7 @@
       <div class="sidebar-footer">
         <div class="user-menu">
           <button id="user-menu-trigger" class="user-chip compact-user" title="用户菜单">
+            <img id="user-avatar-img" class="user-avatar-img" alt="" referrerpolicy="no-referrer" />
             <span>张敏</span>
             <small>系统管理员</small>
           </button>

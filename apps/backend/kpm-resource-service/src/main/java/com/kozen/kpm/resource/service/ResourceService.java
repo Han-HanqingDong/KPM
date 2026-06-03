@@ -1,14 +1,19 @@
 package com.kozen.kpm.resource.service;
 
+import com.kozen.kpm.resource.dto.DepartmentDto;
 import com.kozen.kpm.resource.dto.DepartmentRequest;
+import com.kozen.kpm.resource.dto.EnumItemDto;
 import com.kozen.kpm.resource.dto.EnumItemRequest;
 import com.kozen.kpm.resource.dto.PrototypeStateRequest;
+import com.kozen.kpm.resource.dto.ResourceBootstrapDto;
+import com.kozen.kpm.resource.dto.RoleDto;
 import com.kozen.kpm.resource.dto.RoleRequest;
+import com.kozen.kpm.resource.dto.TaskStatusTransitionDto;
 import com.kozen.kpm.resource.dto.TaskStatusTransitionRequest;
 import com.kozen.kpm.resource.dto.UserRequest;
+import com.kozen.kpm.resource.dto.UserResourceDto;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * Resource domain service.
@@ -17,7 +22,7 @@ import java.util.Map;
  */
 public interface ResourceService {
     /** Load all resource data required by the frontend bootstrap process. */
-    Map<String, Object> bootstrap();
+    ResourceBootstrapDto bootstrap();
 
     /** Load persisted prototype state for pilot validation. */
     Object prototypeState();
@@ -26,55 +31,55 @@ public interface ResourceService {
     boolean savePrototypeState(PrototypeStateRequest request);
 
     /** Query users with departments, roles and direct permissions. */
-    List<Map<String, Object>> users();
+    List<UserResourceDto> users();
 
-    /** Create one user. */
-    Map<String, Object> createUser(UserRequest request);
+    /** Create one user and return the created user plus default password. */
+    UserResourceDto createUser(UserRequest request);
 
     /** Update one user. */
-    Map<String, Object> updateUser(String id, UserRequest request);
+    UserResourceDto updateUser(String id, UserRequest request);
 
     /** Reset one user's password to the configured default password. */
-    Map<String, Object> resetUserPassword(String id);
+    UserResourceDto resetUserPassword(String id);
 
     /** Delete one user. */
     boolean deleteUser(String id);
 
     /** Query flat department list. */
-    List<Map<String, Object>> departments();
+    List<DepartmentDto> departments();
 
     /** Create one department. */
-    Map<String, Object> createDepartment(DepartmentRequest request);
+    DepartmentDto createDepartment(DepartmentRequest request);
 
     /** Update one department. */
-    Map<String, Object> updateDepartment(String id, DepartmentRequest request);
+    DepartmentDto updateDepartment(String id, DepartmentRequest request);
 
     /** Delete one department. */
     boolean deleteDepartment(String id);
 
     /** Query roles with permission code list. */
-    List<Map<String, Object>> roles();
+    List<RoleDto> roles();
 
     /** Create one role and configure permissions. */
-    Map<String, Object> createRole(RoleRequest request);
+    RoleDto createRole(RoleRequest request);
 
     /** Update one role and configure permissions. */
-    Map<String, Object> updateRole(String id, RoleRequest request);
+    RoleDto updateRole(String id, RoleRequest request);
 
     /** Delete one role. */
     boolean deleteRole(String id);
 
     /** Create one enum item. */
-    Map<String, Object> createEnum(EnumItemRequest request);
+    EnumItemDto createEnum(EnumItemRequest request);
 
     /** Update one enum item. */
-    Map<String, Object> updateEnum(String id, EnumItemRequest request);
+    EnumItemDto updateEnum(String id, EnumItemRequest request);
 
     /** Delete one enum item. */
     boolean deleteEnum(String id);
 
     /** Create one task status transition rule. */
-    Map<String, Object> createTaskStatusTransition(TaskStatusTransitionRequest request);
+    TaskStatusTransitionDto createTaskStatusTransition(TaskStatusTransitionRequest request);
 
     /** Delete one task status transition rule. */
     boolean deleteTaskStatusTransition(String id);

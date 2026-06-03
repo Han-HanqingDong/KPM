@@ -2,44 +2,58 @@ package com.kozen.kpm.resource.service.impl;
 
 import com.kozen.kpm.common.util.IdUtil;
 import com.kozen.kpm.common.util.JsonUtil;
+import com.kozen.kpm.resource.converter.ResourceConverter;
+import com.kozen.kpm.resource.dto.DepartmentDto;
 import com.kozen.kpm.resource.dto.DepartmentRequest;
+import com.kozen.kpm.resource.dto.EnumItemDto;
 import com.kozen.kpm.resource.dto.EnumItemRequest;
 import com.kozen.kpm.resource.dto.PrototypeStateRequest;
+import com.kozen.kpm.resource.dto.ResourceBootstrapDto;
+import com.kozen.kpm.resource.dto.RoleDto;
 import com.kozen.kpm.resource.dto.RoleRequest;
+import com.kozen.kpm.resource.dto.TaskStatusTransitionDto;
 import com.kozen.kpm.resource.dto.TaskStatusTransitionRequest;
 import com.kozen.kpm.resource.dto.UserRequest;
+import com.kozen.kpm.resource.dto.UserResourceDto;
+import com.kozen.kpm.resource.entity.RoleEntity;
+import com.kozen.kpm.resource.entity.UserResourceEntity;
 import com.kozen.kpm.resource.mapper.ResourceMapper;
 import com.kozen.kpm.resource.service.ResourceService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
  * Default resource service implementation.
+ *
+ * <p>This class keeps resource-management business rules in one place and returns typed DTOs to
+ * controllers. Mapper entities are converted before crossing the API boundary, which makes the
+ * service easier to refactor and safer for Swagger/API consumers.</p>
  */
 @Service
 public class ResourceServiceImpl implements ResourceService {
     private static final String DEFAULT_INITIAL_PASSWORD = "123456";
 
     private final ResourceMapper resourceMapper;
+    private final ResourceConverter resourceConverter;
 
-    public ResourceServiceImpl(ResourceMapper resourceMapper) {
+    public ResourceServiceImpl(ResourceMapper resourceMapper, ResourceConverter resourceConverter) {
         this.resourceMapper = resourceMapper;
+        this.resourceConverter = resourceConverter;
     }
 
     @Override
-    public Map<String, Object> bootstrap() {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("users", users());
-        data.put("departments", departments());
-        data.put("roles", roles());
-        data.put("permissions", resourceMapper.permissions());
-        data.put("enumItems", resourceMapper.enumItems());
-        data.put("taskStatusTransitions", resourceMapper.taskStatusTransitions());
-        return data;
+    public ResourceBootstrapDto bootstrap() {
+        return new ResourceBootstrapDto(
+                users(),
+                departments(),
+                roles(),
+                resourceMapper.permissions().stream().map(resourceConverter::toPermissionDto).toList(),
+                resourceMapper.enumItems().stream().map(resourceConverter::toEnumItemDto).toList(),
+                resourceMapper.taskStatusTransitions().stream().map(resourceConverter::toTaskStatusTransitionDto).toList()
+        );
     }
 
     @Override
@@ -57,37 +71,33 @@ public class ResourceServiceImpl implements ResourceService {
     }
 
     @Override
-    public List<Map<String, Object>> users() {
-        List<Map<String, Object>> rows = resourceMapper.users();
-        rows.forEach(this::enrichUser);
-        return rows;
+    public List<UserResourceDto> users() {
+        return resourceMapper.users().stream()
+                .map(user -> enrichUser(user, null))
+                .toList();
     }
 
     @Override
     @Transactional
-    public Map<String, Object> createUser(UserRequest request) {
+    public UserResourceDto createUser(UserRequest request) {
         String id = id("user", request.loginAccount());
         resourceMapper.insertUser(id, request);
         replaceUserRelations(id, request);
-        Map<String, Object> user = getUser(id);
-        user.put("defaultPassword", DEFAULT_INITIAL_PASSWORD);
-        return user;
+        return getUser(id, DEFAULT_INITIAL_PASSWORD);
     }
 
     @Override
     @Transactional
-    public Map<String, Object> updateUser(String id, UserRequest request) {
+    public UserResourceDto updateUser(String id, UserRequest request) {
         resourceMapper.updateUser(id, request);
         replaceUserRelations(id, request);
-        return getUser(id);
+        return getUser(id, null);
     }
 
     @Override
-    public Map<String, Object> resetUserPassword(String id) {
+    public UserResourceDto resetUserPassword(String id) {
         resourceMapper.resetUserPassword(id, "{noop}" + DEFAULT_INITIAL_PASSWORD);
-        Map<String, Object> result = getUser(id);
-        result.put("defaultPassword", DEFAULT_INITIAL_PASSWORD);
-        return result;
+        return getUser(id, DEFAULT_INITIAL_PASSWORD);
     }
 
     @Override
@@ -97,21 +107,23 @@ public class ResourceServiceImpl implements ResourceService {
     }
 
     @Override
-    public List<Map<String, Object>> departments() {
-        return resourceMapper.departments();
+    public List<DepartmentDto> departments() {
+        return resourceMapper.departments().stream()
+                .map(resourceConverter::toDepartmentDto)
+                .toList();
     }
 
     @Override
-    public Map<String, Object> createDepartment(DepartmentRequest request) {
+    public DepartmentDto createDepartment(DepartmentRequest request) {
         String id = id("dept", request.name());
         resourceMapper.insertDepartment(id, request);
-        return resourceMapper.department(id);
+        return resourceConverter.toDepartmentDto(resourceMapper.department(id));
     }
 
     @Override
-    public Map<String, Object> updateDepartment(String id, DepartmentRequest request) {
+    public DepartmentDto updateDepartment(String id, DepartmentRequest request) {
         resourceMapper.updateDepartment(id, request);
-        return resourceMapper.department(id);
+        return resourceConverter.toDepartmentDto(resourceMapper.department(id));
     }
 
     @Override
@@ -121,27 +133,27 @@ public class ResourceServiceImpl implements ResourceService {
     }
 
     @Override
-    public List<Map<String, Object>> roles() {
-        List<Map<String, Object>> rows = resourceMapper.roles();
-        rows.forEach(row -> row.put("permissions", resourceMapper.rolePermissions(String.valueOf(row.get("id")))));
-        return rows;
+    public List<RoleDto> roles() {
+        return resourceMapper.roles().stream()
+                .map(this::enrichRole)
+                .toList();
     }
 
     @Override
     @Transactional
-    public Map<String, Object> createRole(RoleRequest request) {
+    public RoleDto createRole(RoleRequest request) {
         String id = id("role", request.name());
         resourceMapper.insertRole(id, request);
         replaceRolePermissions(id, request);
-        return resourceMapper.role(id);
+        return getRole(id);
     }
 
     @Override
     @Transactional
-    public Map<String, Object> updateRole(String id, RoleRequest request) {
+    public RoleDto updateRole(String id, RoleRequest request) {
         resourceMapper.updateRole(id, request);
         replaceRolePermissions(id, request);
-        return resourceMapper.role(id);
+        return getRole(id);
     }
 
     @Override
@@ -151,16 +163,16 @@ public class ResourceServiceImpl implements ResourceService {
     }
 
     @Override
-    public Map<String, Object> createEnum(EnumItemRequest request) {
+    public EnumItemDto createEnum(EnumItemRequest request) {
         String id = id("enum", request.enumType() + "-" + request.normalizedValue());
         resourceMapper.insertEnum(id, request);
-        return resourceMapper.enumItem(id);
+        return resourceConverter.toEnumItemDto(resourceMapper.enumItem(id));
     }
 
     @Override
-    public Map<String, Object> updateEnum(String id, EnumItemRequest request) {
+    public EnumItemDto updateEnum(String id, EnumItemRequest request) {
         resourceMapper.updateEnum(id, request);
-        return resourceMapper.enumItem(id);
+        return resourceConverter.toEnumItemDto(resourceMapper.enumItem(id));
     }
 
     @Override
@@ -170,17 +182,15 @@ public class ResourceServiceImpl implements ResourceService {
     }
 
     @Override
-    public Map<String, Object> createTaskStatusTransition(TaskStatusTransitionRequest request) {
+    public TaskStatusTransitionDto createTaskStatusTransition(TaskStatusTransitionRequest request) {
         if (request.fromStatus().equals(request.toStatus())) {
             throw new IllegalArgumentException("起始状态和目标状态不能相同");
         }
         List<String> existingIds = resourceMapper.taskStatusTransitionIdsByPair(request.fromStatus(), request.toStatus());
-        if (!existingIds.isEmpty()) {
-            return resourceMapper.taskStatusTransition(existingIds.getFirst());
-        }
-        String id = id("tr-task", request.fromStatus() + "-" + request.toStatus());
-        resourceMapper.insertTaskStatusTransition(id, request.fromStatus(), request.toStatus());
-        return resourceMapper.taskStatusTransition(id);
+        String transitionId = existingIds.isEmpty()
+                ? createTaskStatusTransitionRow(request)
+                : existingIds.getFirst();
+        return resourceConverter.toTaskStatusTransitionDto(resourceMapper.taskStatusTransition(transitionId));
     }
 
     @Override
@@ -189,17 +199,41 @@ public class ResourceServiceImpl implements ResourceService {
         return true;
     }
 
-    private void enrichUser(Map<String, Object> user) {
-        String id = String.valueOf(user.get("id"));
-        user.put("departments", resourceMapper.userDepartments(id));
-        user.put("globalRoles", resourceMapper.userRoles(id));
-        user.put("directPermissions", resourceMapper.userDirectPermissions(id));
+    private String createTaskStatusTransitionRow(TaskStatusTransitionRequest request) {
+        String id = id("tr-task", request.fromStatus() + "-" + request.toStatus());
+        resourceMapper.insertTaskStatusTransition(id, request.fromStatus(), request.toStatus());
+        return id;
     }
 
-    private Map<String, Object> getUser(String id) {
-        Map<String, Object> user = resourceMapper.user(id);
-        enrichUser(user);
-        return user;
+    private UserResourceDto enrichUser(UserResourceEntity user, String defaultPassword) {
+        String id = user.getId();
+        return resourceConverter.toUserDto(
+                user,
+                resourceMapper.userDepartments(id),
+                resourceMapper.userRoles(id),
+                resourceMapper.userDirectPermissions(id),
+                defaultPassword
+        );
+    }
+
+    private UserResourceDto getUser(String id, String defaultPassword) {
+        UserResourceEntity user = resourceMapper.user(id);
+        if (user == null) {
+            throw new IllegalArgumentException("用户不存在");
+        }
+        return enrichUser(user, defaultPassword);
+    }
+
+    private RoleDto enrichRole(RoleEntity role) {
+        return resourceConverter.toRoleDto(role, resourceMapper.rolePermissions(role.getId()));
+    }
+
+    private RoleDto getRole(String id) {
+        RoleEntity role = resourceMapper.role(id);
+        if (role == null) {
+            throw new IllegalArgumentException("角色不存在");
+        }
+        return enrichRole(role);
     }
 
     private void replaceUserRelations(String userId, UserRequest request) {

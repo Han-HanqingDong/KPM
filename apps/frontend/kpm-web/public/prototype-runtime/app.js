@@ -697,6 +697,7 @@ let resourceEditIndex = null;
 let resourceSearchKeyword = '';
 let permissionTypeFilter = '全部类型';
 let permissionPickerDrafts = {};
+let modalFormDrafts = {};
 let customerSearchKeyword = '';
 let customerFormOpen = false;
 let customerEditIndex = null;
@@ -723,6 +724,12 @@ let orderHistoryModalOpen = false;
 let orderDetailModalOpen = false;
 let selectedOrderId = null;
 let selectedOrderDetailId = null;
+let orderListFilters = {
+  keyword: '',
+  type: '全部类型',
+  status: '全部状态',
+  project: '全部项目',
+};
 let readableContentModal = null;
 let changePasswordModalOpen = false;
 let analyticsTab = 'orders';
@@ -1436,7 +1443,7 @@ const i18nMessages = {
       },
       panelTitle: '任务列表',
       panelDescription: '产品逻辑参考 Jira，并保留 KPM 的项目 / 阶段上下文',
-      headers: { id: '编号', title: '标题', category: '分类', project: '项目', stage: '来源阶段', status: '状态', priority: '优先级', creator: '创建者', assignee: '执行者', participant: '参与者', expectedCompletionAt: '预期完成时间', source: '来源' },
+      headers: { id: '编号', title: '基础信息', category: '分类', project: '项目', stage: '来源阶段', status: '状态', priority: '优先级', creator: '创建者', assignee: '执行者', participant: '参与者', expectedCompletionAt: '预期完成时间', source: '来源' },
       empty: '暂无匹配任务',
       unassigned: '待分配',
       activityFilterLabel: '客户 {customer} / 项目 {project} 的进行中任务',
@@ -1571,7 +1578,7 @@ const i18nMessages = {
       },
       panelTitle: 'Task List',
       panelDescription: 'Jira-inspired task management with KPM project / stage context',
-      headers: { id: 'ID', title: 'Title', category: 'Category', project: 'Project', stage: 'Source stage', status: 'Status', priority: 'Priority', creator: 'Creator', assignee: 'Assignees', participant: 'Participants', expectedCompletionAt: 'Expected completion', source: 'Source' },
+      headers: { id: 'ID', title: 'Basic info', category: 'Category', project: 'Project', stage: 'Source stage', status: 'Status', priority: 'Priority', creator: 'Creator', assignee: 'Assignees', participant: 'Participants', expectedCompletionAt: 'Expected completion', source: 'Source' },
       empty: 'No matching tasks',
       unassigned: 'Unassigned',
       activityFilterLabel: 'Active tasks for customer {customer} / project {project}',
@@ -1899,9 +1906,203 @@ function renderNameDatalist(id, names = []) {
   `;
 }
 
-function renderFormModal(content, size = 'wide') {
+function inferActiveModalKey() {
+  if (projectEditModalOpen) return 'project-edit';
+  if (confirmationDialog) return 'confirmation';
+  if (readableContentModal) return `readable-${readableContentModal.type || 'content'}`;
+  if (changePasswordModalOpen) return 'change-password';
+  if (projectSkuModalOpen) return 'project-sku';
+  if (memberModalOpen) return 'member-modal';
+  if (stageTaskFormOpen) return 'stage-task-form';
+  if (blockerHelpFormOpen) return 'blocker-help-form';
+  if (projectCustomerFormOpen) return 'project-customer-form';
+  if (customerFormOpen) return 'customer-form';
+  if (customerOrderFormOpen) return 'customer-order-form';
+  if (customerContactFormOpen) return 'customer-contact-form';
+  if (customerFollowupFormOpen) return 'customer-followup-form';
+  if (requirementFormOpen) return 'requirement-form';
+  if (taskFormOpen) return 'task-form';
+  if (orderFormOpen) return 'order-form';
+  if (orderHistoryModalOpen) return 'order-history';
+  if (orderDetailModalOpen) return 'order-detail';
+  if (templateFormOpen) return 'template-form';
+  if (resourceFormOpen) return 'resource-form';
+  if (taskTransitionFormOpen) return 'task-transition-form';
+  if (mapFullscreenOpen) return 'resource-map-fullscreen';
+  return 'modal';
+}
+
+function modalDraftElements(root) {
+  return [...root.querySelectorAll('input, select, textarea')]
+    .filter((element) => (
+      element.id
+      || element.name
+      || element.dataset?.templateStageName
+      || element.dataset?.permissionSelection
+      || element.dataset?.permissionBulk
+    ));
+}
+
+function modalElementKey(element, index) {
+  return element.id
+    || element.name
+    || element.dataset?.templateStageName
+    || (element.dataset?.permissionBulk ? `${element.dataset.permissionBulk}:${element.value}` : '')
+    || `${element.tagName.toLowerCase()}-${index}`;
+}
+
+function captureModalDraft(modalKey, root) {
+  if (!modalKey || !root) return;
+  const values = {};
+  modalDraftElements(root).forEach((element, index) => {
+    if (element.type === 'file') return;
+    const key = modalElementKey(element, index);
+    if (element.type === 'checkbox' || element.type === 'radio') {
+      values[key] = { type: element.type, checked: element.checked, value: element.value };
+      return;
+    }
+    if (element.tagName === 'SELECT' && element.multiple) {
+      values[key] = { type: 'select-multiple', value: [...element.selectedOptions].map((option) => option.value) };
+      return;
+    }
+    values[key] = { type: element.tagName.toLowerCase(), value: element.value };
+  });
+  modalFormDrafts[modalKey] = values;
+}
+
+function restoreVisibleModalDrafts() {
+  document.querySelectorAll('.modal-backdrop[data-modal-key]').forEach((backdrop) => {
+    const draft = modalFormDrafts[backdrop.dataset.modalKey];
+    if (!draft) return;
+    modalDraftElements(backdrop).forEach((element, index) => {
+      const saved = draft[modalElementKey(element, index)];
+      if (!saved) return;
+      if (element.type === 'checkbox' || element.type === 'radio') {
+        element.checked = Boolean(saved.checked);
+        return;
+      }
+      if (element.tagName === 'SELECT' && element.multiple) {
+        const selected = new Set(saved.value || []);
+        [...element.options].forEach((option) => { option.selected = selected.has(option.value); });
+        return;
+      }
+      element.value = saved.value ?? '';
+    });
+  });
+}
+
+function clearModalDraft(modalKey) {
+  if (!modalKey) return;
+  delete modalFormDrafts[modalKey];
+}
+
+function closeModalStateByKey(modalKey) {
+  if (modalKey === 'project-edit') { projectEditModalOpen = false; return; }
+  if (modalKey === 'confirmation') { confirmationDialog = null; return; }
+  if (modalKey.startsWith('readable-')) { readableContentModal = null; return; }
+  if (modalKey === 'change-password') { changePasswordModalOpen = false; return; }
+  if (modalKey === 'project-sku') { projectSkuModalOpen = false; return; }
+  if (modalKey === 'member-modal') { memberModalOpen = false; return; }
+  if (modalKey === 'stage-task-form') { stageTaskFormOpen = false; return; }
+  if (modalKey === 'blocker-help-form') { blockerHelpFormOpen = false; return; }
+  if (modalKey === 'project-customer-form') { projectCustomerFormOpen = false; return; }
+  if (modalKey === 'customer-form') { customerFormOpen = false; return; }
+  if (modalKey === 'customer-order-form') { customerOrderFormOpen = false; return; }
+  if (modalKey === 'customer-contact-form') { customerContactFormOpen = false; return; }
+  if (modalKey === 'customer-followup-form') { customerFollowupFormOpen = false; return; }
+  if (modalKey === 'requirement-form') { requirementFormOpen = false; return; }
+  if (modalKey === 'task-form') { taskFormOpen = false; return; }
+  if (modalKey === 'order-form') { orderFormOpen = false; return; }
+  if (modalKey === 'order-history') { orderHistoryModalOpen = false; return; }
+  if (modalKey === 'order-detail') { orderDetailModalOpen = false; return; }
+  if (modalKey === 'template-form') { templateFormOpen = false; return; }
+  if (modalKey === 'resource-form') { resourceFormOpen = false; return; }
+  if (modalKey === 'task-transition-form') { taskTransitionFormOpen = false; return; }
+  if (modalKey === 'resource-map-fullscreen') { mapFullscreenOpen = false; return; }
+  if (modalKey === 'activity-cell') { selectedActivityCell = null; }
+}
+
+function modalDraftResetKeyForAction(action) {
+  return {
+    'save-order': 'order-form',
+    'save-customer-order': 'customer-order-form',
+    'save-customer-master': 'customer-form',
+    'save-customer-contact': 'customer-contact-form',
+    'save-customer-followup': 'customer-followup-form',
+    'save-task': 'task-form',
+    'save-stage-task': 'stage-task-form',
+    'save-blocker-help-task': 'blocker-help-form',
+    'save-project-members-modal': 'member-modal',
+    'save-project-edit': 'project-edit',
+    'save-project-customer': 'project-customer-form',
+    'save-project-sku': 'project-sku',
+    'save-requirement': 'requirement-form',
+    'save-resource': 'resource-form',
+    'save-template': 'template-form',
+    'save-task-transition': 'task-transition-form',
+    'save-change-password': 'change-password',
+    'confirm-dialog': 'confirmation',
+    'cancel-order-form': 'order-form',
+    'close-order-history': 'order-history',
+    'close-order-detail': 'order-detail',
+    'cancel-customer-master-form': 'customer-form',
+    'toggle-customer-master-form': 'customer-form',
+    'toggle-customer-order-form': 'customer-order-form',
+    'toggle-customer-contact-form': 'customer-contact-form',
+    'toggle-customer-followup-form': 'customer-followup-form',
+    'cancel-resource-form': 'resource-form',
+    'cancel-template-form': 'template-form',
+    'close-change-password': 'change-password',
+    'close-readable-modal': null,
+    'cancel-confirmation': 'confirmation',
+    'close-project-sku-modal': 'project-sku',
+    'close-member-modal': 'member-modal',
+    'close-stage-task-modal': 'stage-task-form',
+    'close-blocker-help-modal': 'blocker-help-form',
+    'toggle-requirement-form': 'requirement-form',
+    'toggle-project-customer-form': 'project-customer-form',
+    'toggle-task-form': 'task-form',
+    'toggle-order-form': 'order-form',
+    'toggle-task-transition-form': 'task-transition-form',
+    'cancel-project-edit': 'project-edit',
+    'close-resource-map-fullscreen': 'resource-map-fullscreen',
+  }[action];
+}
+
+function clearModalDraftForAction(action, fallbackKey = '') {
+  clearModalDraft(modalDraftResetKeyForAction(action) || fallbackKey);
+}
+
+function renderCurrentSurfaceAfterModalChange() {
+  const view = activeViewName();
+  if (view === 'project-detail') renderProjectDetail();
+  else if (view === 'customers') renderProjectCustomers();
+  else if (view === 'materials') renderProjectMaterials();
+  else if (view === 'requirements') renderCustomerRequirements();
+  else if (view === 'requirement-overview') renderRequirementOverview();
+  else if (view === 'stage-detail') renderStageDetail();
+  else if (view === 'customer-detail') renderCustomerDetail();
+  else if (view === 'task-detail') renderTaskDetail();
+  else if (view === 'orders') renderOrderManagement();
+  else if (view === 'templates') renderTemplates();
+  else if (view === 'resources') renderResourceContent();
+  else if (view === 'analytics') renderAnalytics();
+  else renderGlobalModals();
+  applyPermissionVisibility();
+}
+
+function closeModalFromBackdrop(backdrop) {
+  const modalKey = backdrop.dataset.modalKey || inferActiveModalKey();
+  captureModalDraft(modalKey, backdrop);
+  closeModalStateByKey(modalKey);
+  renderCurrentSurfaceAfterModalChange();
+}
+
+function renderFormModal(content, size = 'wide', modalKey = 'auto') {
+  const resolvedModalKey = modalKey === 'auto' ? inferActiveModalKey() : modalKey;
+  queueMicrotask(restoreVisibleModalDrafts);
   return `
-    <div class="modal-backdrop">
+    <div class="modal-backdrop" data-modal-key="${resolvedModalKey}">
       <section class="modal-card form-modal ${size}">
         ${content}
       </section>
@@ -2241,15 +2442,42 @@ const actionPermissionMap = {
   'delete-order': 'button:orders:delete',
 };
 
+function hashStringForAvatar(value = '') {
+  return [...String(value || 'kozen')].reduce((hash, char) => ((hash << 5) - hash + char.charCodeAt(0)) | 0, 0);
+}
+
+function userAvatarUrl(account = currentAccount, name = currentUser) {
+  const styles = ['adventurer', 'avataaars', 'bottts-neutral', 'lorelei'];
+  const seed = encodeURIComponent(account || name || 'kozen-user');
+  const style = styles[Math.abs(hashStringForAvatar(seed)) % styles.length];
+  return `https://api.dicebear.com/10.x/${style}/svg?seed=${seed}&backgroundColor=fff35a,b7ff38,1fd7c7&radius=50`;
+}
+
+function currentUserRoleLabel() {
+  return currentUserRoles.join('、') || '普通用户';
+}
+
+function setTextIfPresent(root, selector, value) {
+  const node = root?.querySelector(selector);
+  if (node) node.textContent = value;
+}
+
+function updateUserAvatar(trigger) {
+  const avatar = trigger?.querySelector('#user-avatar-img');
+  if (!avatar) return;
+  avatar.src = userAvatarUrl(currentAccount, currentUser);
+  avatar.onerror = () => { avatar.removeAttribute('src'); };
+}
+
 function updateCurrentUserDisplay() {
   const trigger = document.getElementById('user-menu-trigger');
   if (!trigger) return;
-  const nameNode = trigger.querySelector('span');
-  const roleNode = trigger.querySelector('small');
-  if (nameNode) nameNode.textContent = currentUser;
-  if (roleNode) roleNode.textContent = currentUserRoles.join('、') || '普通用户';
-  trigger.dataset.initial = (currentUser || 'U').trim().slice(0, 1).toUpperCase();
-  trigger.title = `${currentUser} · ${currentUserRoles.join('、') || '普通用户'}`;
+  const roleLabel = currentUserRoleLabel();
+  setTextIfPresent(trigger, 'span', currentUser);
+  setTextIfPresent(trigger, 'small', roleLabel);
+  trigger.dataset.initial = '';
+  trigger.title = `${currentUser} · ${roleLabel}`;
+  updateUserAvatar(trigger);
 }
 
 function syncSession(loginResult = {}) {
@@ -2374,30 +2602,37 @@ function permissionSelectionMeta(permissionKey) {
 function renderPermissionPicker(context, selectedKeys = [], emptyText = '暂无授权权限') {
   const selected = uniquePermissionKeys(selectedKeys);
   const selectedSet = new Set(selected);
-  const candidates = systemPermissionCatalog()
-    .filter((permission) => !selectedSet.has(permission.key))
-    .map(permissionSearchLabel);
   const inputId = permissionPickerInputId(context);
+  const availablePermissions = systemPermissionCatalog().filter((permission) => !selectedSet.has(permission.key));
 
   return `
     <div class="permission-picker">
       <div class="permission-picker-head">
         <span>${permissionCountLabel(selected, '0 项权限')}</span>
-        <small class="field-hint">通过搜索添加真实菜单或按钮权限，避免一次性铺开全部权限。</small>
+        <small class="field-hint">勾选真实菜单或按钮权限后一次性添加，避免逐个点击。</small>
       </div>
-      <div class="permission-search-box">
-        <input id="${inputId}" class="text-input" list="${inputId}-options" placeholder="输入权限名称 / 菜单 / 按钮后添加" />
-        ${renderNameDatalist(`${inputId}-options`, candidates)}
-        <button class="ghost-btn" data-action="add-permission-selection" data-permission-context="${context}">添加权限</button>
-      </div>
-      <div class="permission-multi-box">
-        <select id="${inputId}-multi" class="select-input permission-multi-select" multiple size="8">
-          ${systemPermissionCatalog()
-            .filter((permission) => !selectedSet.has(permission.key))
-            .map((permission) => `<option value="${permission.key}">${permission.name}｜${permission.location}</option>`)
-            .join('')}
-        </select>
-        <button class="ghost-btn" data-action="add-multiple-permission-selection" data-permission-context="${context}">添加选中权限</button>
+      <div class="permission-check-panel">
+        <input
+          id="${inputId}"
+          class="text-input"
+          data-permission-bulk-filter="${context}"
+          placeholder="搜索权限名称 / 菜单 / 按钮"
+        />
+        <div class="permission-checkbox-list">
+          ${availablePermissions.map((permission) => {
+            const searchLabel = permissionSearchLabel(permission).toLowerCase();
+            return `
+              <label class="permission-checkbox-row" data-permission-option-label="${escapeAttr(searchLabel)}">
+                <input type="checkbox" data-permission-bulk="${context}" value="${permission.key}" />
+                <span>
+                  <strong>${permission.name}</strong>
+                  <small>${permission.type} · ${permission.location} · ${permission.target}</small>
+                </span>
+              </label>
+            `;
+          }).join('') || '<p class="empty-note">当前没有可添加的权限</p>'}
+        </div>
+        <button class="ghost-btn" data-action="add-multiple-permission-selection" data-permission-context="${context}">添加勾选权限</button>
       </div>
       <div class="permission-selected-list">
         ${selected.map((permissionKey) => {
@@ -2417,6 +2652,7 @@ function renderPermissionPicker(context, selectedKeys = [], emptyText = '暂无�
     </div>
   `;
 }
+
 
 function userByAccount(account) {
   return resourceData.users.find((user) => user.account === account);
@@ -2955,12 +3191,10 @@ function renderProjectTable(filter = '') {
       <td>${project.status}</td>
       <td><span class="badge ${project.archived ? 'pending' : 'done'}">${project.archived ? '已归档' : '未归档'}</span></td>
       <td class="row-actions">
-        <button class="ghost-btn" data-project-id="${project.id}">查看详情</button>
-        <button class="ghost-btn" data-action="open-project-edit" data-project-id="${project.id}">编辑</button>
-        <button class="${project.archived ? 'muted-btn' : 'danger-btn'}" data-action="request-project-archive" data-project-id="${project.id}">
-          ${project.archived ? '恢复' : '归档'}
-        </button>
-        <button class="danger-btn" data-action="request-project-delete" data-project-id="${project.id}">删除</button>
+        ${renderDirectRowAction('👁', '查看项目详情', `data-project-id="${escapeAttr(project.id)}"`)}
+        ${renderRowAction('open-project-edit', '✎', '编辑项目', `data-project-id="${escapeAttr(project.id)}"`)}
+        ${renderRowAction('request-project-archive', project.archived ? '↩' : '📦', project.archived ? '恢复项目' : '归档项目', `data-project-id="${escapeAttr(project.id)}"`, project.archived ? 'muted' : 'danger')}
+        ${renderRowAction('request-project-delete', '🗑', '删除项目', `data-project-id="${escapeAttr(project.id)}"`, 'danger')}
       </td>
     </tr>
   `).join('') || '<tr><td colspan="9">暂无匹配项目</td></tr>';
@@ -2989,7 +3223,7 @@ function renderProjectSkuModal(project) {
   if (!projectSkuModalOpen) return '';
   const editingSku = projectSkuEditIndex === null ? null : project.skus?.[projectSkuEditIndex];
   return `
-    <div class="modal-backdrop">
+    <div class="modal-backdrop" data-modal-key="project-sku">
       <section class="modal-card form-modal wide">
         <div class="panel-head">
           <div>
@@ -3038,8 +3272,8 @@ function renderProjectSkuModal(project) {
                   <td>${sku.memoryType}</td>
                   <td><span class="badge ${sku.active !== false ? 'done' : 'pending'}">${sku.active !== false ? '启用' : '停用'}</span></td>
                   <td class="row-actions">
-                    <button class="ghost-btn" data-action="edit-project-sku" data-sku-index="${index}">编辑</button>
-                    <button class="danger-btn" data-action="delete-project-sku" data-sku-index="${index}">删除</button>
+                    ${renderRowAction('edit-project-sku', '✎', '编辑 SKU', `data-sku-index="${index}"`)}
+                    ${renderRowAction('delete-project-sku', '🗑', '删除 SKU', `data-sku-index="${index}"`, 'danger')}
                   </td>
                 </tr>
               `).join('') || '<tr><td colspan="5">暂无 SKU，请先新增后再录入订单。</td></tr>'}
@@ -3195,7 +3429,7 @@ function renderProjectDetail() {
     </div>
 
     ${memberModalOpen ? `
-      <div class="modal-backdrop">
+      <div class="modal-backdrop" data-modal-key="member-modal">
         <section class="modal-card member-modal">
           <div class="panel-head">
             <div>
@@ -3458,7 +3692,7 @@ function renderReadableContentModal() {
       </div>
       ${body}
     </div>
-  `, size);
+  `, size, `readable-${type}`);
 }
 
 function renderChangePasswordModal() {
@@ -3468,7 +3702,6 @@ function renderChangePasswordModal() {
         <h2>修改密码</h2>
         <p>当前账号：${currentAccount}。新密码至少 6 位。</p>
       </div>
-      <button class="muted-btn" data-action="close-change-password">关闭</button>
     </div>
     <div class="form-grid">
       <div class="form-field full">
@@ -3488,18 +3721,18 @@ function renderChangePasswordModal() {
       <button class="muted-btn" data-action="close-change-password">取消</button>
       <button class="primary-btn" data-action="save-change-password">保存新密码</button>
     </div>
-  `, 'narrow');
+  `, 'narrow', 'change-password');
 }
 
 function renderGlobalModals() {
   if (!globalModalRoot) return;
   const project = projects.find((item) => item.id === editingProjectId);
   if (projectEditModalOpen && project) {
-    globalModalRoot.innerHTML = renderFormModal(renderProjectEditContent(project), 'wide');
+    globalModalRoot.innerHTML = renderFormModal(renderProjectEditContent(project), 'wide', 'project-edit');
     return;
   }
   if (confirmationDialog) {
-    globalModalRoot.innerHTML = renderFormModal(renderConfirmationDialog(), 'narrow');
+    globalModalRoot.innerHTML = renderFormModal(renderConfirmationDialog(), 'narrow', 'confirmation');
     return;
   }
   if (readableContentModal) {
@@ -3721,7 +3954,7 @@ function renderStageDetail() {
     </div>
 
     ${stageTaskFormOpen ? `
-      <div class="modal-backdrop">
+      <div class="modal-backdrop" data-modal-key="stage-task-form">
         <section class="modal-card">
           <div class="panel-head">
             <div>
@@ -3772,7 +4005,7 @@ function renderStageDetail() {
     ` : ''}
 
     ${blockerHelpFormOpen ? `
-      <div class="modal-backdrop">
+      <div class="modal-backdrop" data-modal-key="blocker-help-form">
         <section class="modal-card">
           <div class="panel-head">
             <div>
@@ -3889,8 +4122,8 @@ function renderProjectCustomers() {
                 <td>${taskPersonLabel(customerSalesOwners(customer.customerName))}</td>
                 <td>${taskPersonLabel(customerSupportOwners(customer.customerName))}</td>
                 <td class="row-actions">
-                  <button class="ghost-btn" data-action="open-customer-detail" data-customer-name="${customer.customerName}">客户详情</button>
-                  <button class="ghost-btn" data-action="open-customer-requirements" data-customer-index="${index}">需求列表</button>
+                  ${renderRowAction('open-customer-detail', '👁', '客户详情', `data-customer-name="${escapeAttr(customer.customerName)}"`)}
+                  ${renderRowAction('open-customer-requirements', '☑', '需求列表', `data-customer-index="${index}"`)}
                 </td>
               </tr>
             `).join('') || '<tr><td colspan="7">暂无关联客户</td></tr>'}
@@ -4047,9 +4280,11 @@ function renderCustomerManagement() {
                 <td>${(customer.materials || []).length} 份</td>
                 <td>${customerOrderCount(customer.name)} 单</td>
                 <td class="row-actions">
-                  <button class="ghost-btn" data-action="open-customer-detail" data-customer-name="${customer.name}">详情</button>
-                  <button class="ghost-btn" data-action="edit-customer-master" data-customer-index="${index}">编辑</button>
-                  <button class="danger-btn" data-action="delete-customer-master" data-customer-index="${index}" ${canDeleteCustomer(customer) ? '' : 'disabled'}>${canDeleteCustomer(customer) ? '删除' : '使用中'}</button>
+                  ${renderRowAction('open-customer-detail', '👁', '客户详情', `data-customer-name="${escapeAttr(customer.name)}"`)}
+                  ${renderRowAction('edit-customer-master', '✎', '编辑客户', `data-customer-index="${index}"`)}
+                  ${canDeleteCustomer(customer)
+                    ? renderRowAction('delete-customer-master', '🗑', '删除客户', `data-customer-index="${index}"`, 'danger')
+                    : renderDisabledRowAction('🔒', '使用中，不能删除')}
                 </td>
               </tr>
             `).join('') || '<tr><td colspan="12">暂无匹配客户</td></tr>'}
@@ -4145,8 +4380,9 @@ function renderCustomerDetail() {
                 <td><span class="badge ${customerProjectStatusBadgeClass(link.projectStatus)}">${link.projectStatus}</span></td>
                 <td><span class="badge ${project.salesability === '可销售' ? 'done' : 'pending'}">${project.salesability}</span></td>
                 <td>${projectOrders.length}</td>
-                <td>${latestOrder ? `${latestOrder.id} · ${latestOrder.orderDate}` : '-'}</td>
-                <td><button class="ghost-btn" data-action="open-linked-project" data-project-id="${project.id}">查看项目</button></td>
+                <td>${latestOrder ? `${renderCompactId(latestOrder.id, { type: 'order' })} · ${latestOrder.orderDate}` : '-'}</td>
+                <td class="row-actions">${renderRowAction('open-linked-project', '👁', '查看项目', `data-project-id="${escapeAttr(project.id)}"`)}
+                </td>
               </tr>
             `).join('') || '<tr><td colspan="7">暂无关联项目；从项目详情关联客户，或创建该客户订单时会自动建立关联。</td></tr>'}
           </tbody>
@@ -4407,6 +4643,53 @@ function taskFilterOption(value, selectedValue, label = value) {
   return `<option value="${escapeAttr(value)}" ${value === selectedValue ? 'selected' : ''}>${escapeAttr(label)}</option>`;
 }
 
+function compactRecordId(id = '', type = '') {
+  const value = String(id || '-');
+  const testMatch = value.match(/^test-(order|task)-(\d{3})-(\d{2})$/i);
+  const prefixMap = { order: 'ORD', task: 'TSK' };
+  if (testMatch) return `${prefixMap[testMatch[1].toLowerCase()] || testMatch[1].toUpperCase().slice(0, 3)}-${testMatch[2]}-${testMatch[3]}`;
+  if (/^KPM-\d+$/i.test(value)) return value;
+  if (value.length <= 14) return value;
+  const prefix = prefixMap[type] || value.slice(0, 3).toUpperCase();
+  return `${prefix}-${value.slice(-8)}`;
+}
+
+function renderCompactId(value, options = {}) {
+  const fullValue = String(value || '-');
+  const label = compactRecordId(fullValue, options.type);
+  const action = options.action || '';
+  const attrs = options.attrs || '';
+  if (!action) return `<span class="compact-id" title="${escapeAttr(fullValue)}">${escapeAttr(label)}</span>`;
+  return `<button class="inline-link compact-id-link" data-action="${action}" ${attrs} title="${escapeAttr(fullValue)}">${escapeAttr(label)}</button>`;
+}
+
+function renderRowAction(action, icon, label, attrs = '', variant = 'ghost') {
+  const variantClass = variant === 'danger' ? 'danger-btn' : variant === 'muted' ? 'muted-btn' : 'ghost-btn';
+  return `
+    <button class="${variantClass} icon-btn" data-action="${action}" ${attrs} title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}">
+      <span aria-hidden="true">${icon}</span>
+    </button>
+  `;
+}
+
+function renderDirectRowAction(icon, label, attrs = '', variant = 'ghost') {
+  const variantClass = variant === 'danger' ? 'danger-btn' : variant === 'muted' ? 'muted-btn' : 'ghost-btn';
+  return `
+    <button class="${variantClass} icon-btn" ${attrs} title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}">
+      <span aria-hidden="true">${icon}</span>
+    </button>
+  `;
+}
+
+function renderDisabledRowAction(icon, label, variant = 'muted') {
+  const variantClass = variant === 'danger' ? 'danger-btn' : variant === 'ghost' ? 'ghost-btn' : 'muted-btn';
+  return `
+    <button class="${variantClass} icon-btn" disabled title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}">
+      <span aria-hidden="true">${icon}</span>
+    </button>
+  `;
+}
+
 function resetTaskListFiltersForContext(taskIds = [], contextLabel = '', contextActive = Boolean(contextLabel)) {
   taskListFilters = {
     keyword: '',
@@ -4559,42 +4842,37 @@ function renderTaskManagement() {
         </div>
       </div>
       <div class="table-wrap">
-        <table>
+        <table class="compact-table task-compact-table">
           <thead>
             <tr>
               <th>${textFor('taskList.headers.id', '编号')}</th>
-              <th>${textFor('taskList.headers.title', '标题')}</th>
+              <th>${textFor('taskList.headers.title', '基础信息')}</th>
               <th>${textFor('taskList.headers.category', '分类')}</th>
-              <th>适用客户</th>
-              <th>${textFor('taskList.headers.project', '项目')}</th>
-              <th>${textFor('taskList.headers.stage', '来源阶段')}</th>
               <th>${textFor('taskList.headers.status', '状态')}</th>
               <th>${textFor('taskList.headers.priority', '优先级')}</th>
-              <th>${textFor('taskList.headers.creator', '创建者')}</th>
               <th>${textFor('taskList.headers.assignee', '执行者')}</th>
-              <th>${textFor('taskList.headers.participant', '参与者')}</th>
               <th>${textFor('taskList.headers.expectedCompletionAt', '预期完成时间')}</th>
-              <th>${textFor('taskList.headers.source', '来源')}</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             ${filteredTasks.map((task) => `
               <tr>
-                <td><button class="inline-link" data-action="open-task-detail" data-task-id="${task.id}" data-return-view="tasks">${task.id}</button></td>
-                <td class="task-title-cell" title="${escapeAttr(task.title)}">${task.title}</td>
-                <td>${task.category}</td>
-                <td>${task.customerName || '中性'}</td>
-                <td>${task.project}</td>
-                <td>${task.stage}</td>
+                <td>${renderCompactId(task.id, { type: 'task', action: 'open-task-detail', attrs: `data-task-id="${escapeAttr(task.id)}" data-return-view="tasks"` })}</td>
+                <td class="primary-list-cell" title="${escapeAttr(task.title)}">
+                  <strong>${escapeAttr(task.title)}</strong>
+                  <small>${escapeAttr(task.project || '-')} · ${escapeAttr(task.stage || '-')} · ${escapeAttr(task.customerName || '中性')} · ${escapeAttr(task.source || '-')} · 创建者 ${escapeAttr(task.creator || '-')}</small>
+                </td>
+                <td><span class="soft-chip">${escapeAttr(task.category)}</span></td>
                 <td><span class="badge ${taskBadgeClass(task.status)}">${task.status}</span></td>
                 <td>${task.priority}</td>
-                <td>${task.creator}</td>
                 <td>${taskPersonLabel(taskAssigneeNames(task), textFor('taskList.unassigned', '待分配'))}</td>
-                <td>${taskPersonLabel(task.participants)}</td>
                 <td>${task.expectedCompletionAt || '-'}</td>
-                <td>${task.source}</td>
+                <td class="row-actions">
+                  ${renderRowAction('open-task-detail', '👁', '查看任务详情', `data-task-id="${escapeAttr(task.id)}" data-return-view="tasks"`)}
+                </td>
               </tr>
-            `).join('') || `<tr><td colspan="13">${textFor('taskList.empty', '暂无匹配任务')}</td></tr>`}
+            `).join('') || `<tr><td colspan="8">${textFor('taskList.empty', '暂无匹配任务')}</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -5014,7 +5292,7 @@ function renderOrderDetailModal(order) {
     memoryType: order.memoryType || order.skuSnapshot?.memoryType,
   };
   return `
-    <div class="modal-backdrop">
+    <div class="modal-backdrop" data-modal-key="order-detail">
       <section class="modal-card form-modal wide">
         <div class="panel-head">
           <div>
@@ -5052,28 +5330,50 @@ function renderOrderDetailModal(order) {
 }
 
 function renderOrderManagement() {
-  const keyword = document.getElementById('order-keyword')?.value.trim().toLowerCase() || '';
-  const filteredOrders = orders.filter((order) => !keyword || [
-    order.id,
-    order.type,
-    order.status,
-    order.customerName,
-    order.projectName,
-    order.wholeMachinePartNumber,
-    order.configurationName,
-    order.specification,
-    order.softwareVersion,
-  ].some((value) => String(value || '').toLowerCase().includes(keyword)));
+  const keywordRaw = orderListFilters.keyword || '';
+  const keyword = keywordRaw.trim().toLowerCase();
+  const typeFilter = orderListFilters.type || '全部类型';
+  const statusFilter = orderListFilters.status || '全部状态';
+  const projectFilter = orderListFilters.project || '全部项目';
+  const filteredOrders = orders.filter((order) => {
+    const matchesKeyword = !keyword || [
+      order.id,
+      order.type,
+      order.status,
+      order.customerName,
+      order.projectName,
+      order.wholeMachinePartNumber,
+      order.configurationName,
+      order.specification,
+      order.softwareVersion,
+    ].some((value) => String(value || '').toLowerCase().includes(keyword));
+    const matchesType = typeFilter === '全部类型' || (order.type || '正式订单') === typeFilter;
+    const matchesStatus = statusFilter === '全部状态' || order.status === statusFilter;
+    const matchesProject = projectFilter === '全部项目' || order.projectName === projectFilter;
+    return matchesKeyword && matchesType && matchesStatus && matchesProject;
+  });
   const editingOrder = orderEditIndex === null ? null : orders[orderEditIndex];
   const selectedHistoryOrder = orders.find((order) => order.id === selectedOrderId);
   const selectedDetailOrder = orders.find((order) => order.id === selectedOrderDetailId);
 
   orderManagement.innerHTML = `
     <div class="toolbar">
-      <input id="order-keyword" type="search" value="${keyword}" placeholder="搜索订单号 / 客户 / 项目 / 规格" />
+      <input id="order-keyword" type="search" value="${escapeAttr(keywordRaw)}" placeholder="搜索订单号 / 客户 / 项目 / 规格" />
+      <select id="order-type-filter" class="select-input compact-filter">
+        ${taskFilterOption('全部类型', typeFilter)}
+        ${orderTypeOptions.filter((item) => item.active !== false).map((item) => taskFilterOption(item.name, typeFilter)).join('')}
+      </select>
+      <select id="order-status-filter" class="select-input compact-filter">
+        ${taskFilterOption('全部状态', statusFilter)}
+        ${orderStatusOptions.filter((item) => item.active !== false).map((item) => taskFilterOption(item.name, statusFilter)).join('')}
+      </select>
+      <select id="order-project-filter" class="select-input compact-filter">
+        ${taskFilterOption('全部项目', projectFilter)}
+        ${orderProjectNames().map((projectName) => taskFilterOption(projectName, projectFilter)).join('')}
+      </select>
       <button class="primary-btn" data-action="toggle-order-form">新增订单</button>
     </div>
-    ${orderFormOpen ? renderFormModal(renderOrderForm(editingOrder), 'wide') : ''}
+    ${orderFormOpen ? renderFormModal(renderOrderForm(editingOrder), 'wide', 'order-form') : ''}
     <section class="panel">
       <div class="panel-head">
         <div>
@@ -5082,15 +5382,16 @@ function renderOrderManagement() {
         </div>
       </div>
       <div class="table-wrap">
-        <table>
+        <table class="compact-table order-compact-table">
           <thead>
             <tr>
               <th>订单号</th>
-              <th>类型 / 状态</th>
+              <th>类型</th>
+              <th>状态</th>
               <th>客户</th>
-              <th>项目</th>
-              <th>SKU</th>
+              <th>项目 / SKU</th>
               <th>数量</th>
+              <th>下单日期</th>
               <th>期望发货</th>
               <th>金额</th>
               <th></th>
@@ -5101,33 +5402,33 @@ function renderOrderManagement() {
               const index = orders.indexOf(order);
               return `
               <tr>
-                <td>${order.id}</td>
-                <td>
-                  <span class="badge progress">${order.type || '正式订单'}</span>
-                  <span class="badge ${orderStatusSemantic(order.status) === 'SHIPPED' || orderStatusSemantic(order.status) === 'COMPLETED' ? 'done' : 'pending'}">${order.status || '-'}</span>
-                  <small class="muted-line">${order.orderDate}</small>
-                </td>
+                <td>${renderCompactId(order.id, { type: 'order', action: 'open-order-detail', attrs: `data-order-id="${escapeAttr(order.id)}"` })}</td>
+                <td><span class="soft-chip">${escapeAttr(order.type || '正式订单')}</span></td>
+                <td><span class="badge ${orderStatusSemantic(order.status) === 'SHIPPED' || orderStatusSemantic(order.status) === 'COMPLETED' ? 'done' : 'pending'}">${order.status || '-'}</span></td>
                 <td>${order.customerName}</td>
-                <td>${order.projectName}</td>
-                <td class="truncate-cell" title="${skuDisplayName(orderSelectedSku(order))}">${order.wholeMachinePartNumber || order.configurationName || '-'}</td>
+                <td class="primary-list-cell compact-project-cell" title="${escapeAttr(`${order.projectName} / ${skuDisplayName(orderSelectedSku(order))}`)}">
+                  <strong>${escapeAttr(order.projectName)}</strong>
+                  <small>${escapeAttr(order.wholeMachinePartNumber || order.configurationName || '-')}</small>
+                </td>
                 <td>${order.quantity}</td>
+                <td>${order.orderDate}</td>
                 <td>${order.expectedShipDate}</td>
                 <td>${formatMoney(order.amount, order.currency)}</td>
                 <td class="row-actions">
-                  <button class="ghost-btn" data-action="open-order-detail" data-order-id="${order.id}">详情</button>
-                  <button class="ghost-btn" data-action="edit-order" data-order-index="${index}">编辑</button>
-                  <button class="ghost-btn" data-action="open-order-history" data-order-id="${order.id}">修改记录</button>
-                  <button class="danger-btn" data-action="delete-order" data-order-index="${index}">删除</button>
+                  ${renderRowAction('open-order-detail', '👁', '查看订单详情', `data-order-id="${escapeAttr(order.id)}"`)}
+                  ${renderRowAction('edit-order', '✎', '编辑订单', `data-order-index="${index}"`)}
+                  ${renderRowAction('open-order-history', '🕘', '查看修改记录', `data-order-id="${escapeAttr(order.id)}"`)}
+                  ${renderRowAction('delete-order', '🗑', '删除订单', `data-order-index="${index}"`, 'danger')}
                 </td>
               </tr>
             `;
-            }).join('') || '<tr><td colspan="9">暂无匹配订单</td></tr>'}
+            }).join('') || '<tr><td colspan="10">暂无匹配订单</td></tr>'}
           </tbody>
         </table>
       </div>
     </section>
     ${orderHistoryModalOpen && selectedHistoryOrder ? `
-      <div class="modal-backdrop">
+      <div class="modal-backdrop" data-modal-key="order-history">
         <section class="modal-card">
           <div class="panel-head">
             <div>
@@ -5780,7 +6081,7 @@ function renderActivityDetailModal() {
     ? `<button class="inline-link metric-link" data-action="open-task-list-filter" data-task-ids="${activeTaskIds.join(',')}" data-filter-label="${escapeAttr(activeTaskFilterLabel)}">${activeTaskIds.length}</button>`
     : '<strong>0</strong>';
   return `
-    <div class="modal-backdrop">
+    <div class="modal-backdrop" data-modal-key="activity-cell">
       <section class="modal-card form-modal wide">
         <div class="panel-head">
           <div>
@@ -5984,7 +6285,7 @@ function renderResourceAnalytics() {
       ${renderUnlocatedCustomers()}
     </section>
     ${mapFullscreenOpen ? `
-      <div class="modal-backdrop">
+      <div class="modal-backdrop" data-modal-key="resource-map-fullscreen">
         <section class="modal-card fullscreen-map-modal">
           <div class="panel-head">
             <div>
@@ -6199,9 +6500,9 @@ function renderTemplateStageRows() {
         <div class="template-stage-row">
           <input class="text-input" data-template-stage-name="${index}" value="${stage}" placeholder="例如 硬件设计" />
           <div class="row-actions">
-            <button class="ghost-btn" data-action="move-template-stage" data-template-stage-index="${index}" data-direction="up" ${index === 0 ? 'disabled' : ''}>上移</button>
-            <button class="ghost-btn" data-action="move-template-stage" data-template-stage-index="${index}" data-direction="down" ${index === templateDraftStages.length - 1 ? 'disabled' : ''}>下移</button>
-            <button class="muted-btn" data-action="delete-template-stage" data-template-stage-index="${index}" ${templateDraftStages.length === 1 ? 'disabled' : ''}>删除</button>
+            <button class="ghost-btn icon-btn" data-action="move-template-stage" data-template-stage-index="${index}" data-direction="up" ${index === 0 ? 'disabled' : ''} title="上移" aria-label="上移"><span aria-hidden="true">↑</span></button>
+            <button class="ghost-btn icon-btn" data-action="move-template-stage" data-template-stage-index="${index}" data-direction="down" ${index === templateDraftStages.length - 1 ? 'disabled' : ''} title="下移" aria-label="下移"><span aria-hidden="true">↓</span></button>
+            <button class="muted-btn icon-btn" data-action="delete-template-stage" data-template-stage-index="${index}" ${templateDraftStages.length === 1 ? 'disabled' : ''} title="删除阶段" aria-label="删除阶段"><span aria-hidden="true">🗑</span></button>
           </div>
         </div>
       `).join('')}
@@ -6258,7 +6559,7 @@ function renderTemplates() {
   normalizeSelectedTemplateIndex();
   const rows = filteredTemplateEntries();
   templateList.innerHTML = `
-    ${templateFormOpen ? renderFormModal(renderTemplateForm(), 'wide') : ''}
+    ${templateFormOpen ? renderFormModal(renderTemplateForm(), 'wide', 'template-form') : ''}
     ${rows.map(({ template, index }) => `
       <article class="template-card">
         <div class="detail-head">
@@ -6272,9 +6573,13 @@ function renderTemplates() {
           ${template.stages.map((stage) => `<span>${stage}</span>`).join('')}
         </div>
         <div class="row-actions">
-          <button class="ghost-btn" data-action="edit-template" data-template-index="${index}">编辑模板</button>
-          <button class="muted-btn" data-action="toggle-template-status" data-template-index="${index}" ${template.status === '启用' && enabledTemplateEntries().length <= 1 ? 'disabled' : ''}>${template.status === '启用' ? '停用' : '启用'}</button>
-          <button class="muted-btn" data-action="delete-template" data-template-index="${index}" ${template.status === '启用' ? 'disabled' : ''}>删除</button>
+          ${renderRowAction('edit-template', '✎', '编辑模板', `data-template-index="${index}"`)}
+          ${template.status === '启用' && enabledTemplateEntries().length <= 1
+            ? renderDisabledRowAction('🔒', '至少需要保留一个启用模板')
+            : renderRowAction('toggle-template-status', template.status === '启用' ? '⏸' : '▶', template.status === '启用' ? '停用模板' : '启用模板', `data-template-index="${index}"`, 'muted')}
+          ${template.status === '启用'
+            ? renderDisabledRowAction('🔒', '启用模板不能删除')
+            : renderRowAction('delete-template', '🗑', '删除模板', `data-template-index="${index}"`, 'danger')}
         </div>
       </article>
     `).join('') || '<p class="empty-note">暂无匹配流程模板</p>'}
@@ -6970,9 +7275,9 @@ function renderResourceTable() {
                 <td><span class="count-pill">${permissionCountLabel(item.directPermissions, '无直授权限')}</span></td>
                 <td><span class="badge ${item.status === '启用' ? 'done' : 'pending'}">${item.status}</span></td>
                 <td class="row-actions">
-                  <button class="ghost-btn" data-action="edit-resource" data-resource-index="${index}">编辑</button>
-                  <button class="muted-btn" data-action="toggle-user-status" data-resource-index="${index}">${item.status === '启用' ? '停用' : '启用'}</button>
-                  <button class="muted-btn" data-action="reset-user-password" data-resource-index="${index}">重置密码</button>
+                  ${renderRowAction('edit-resource', '✎', '编辑用户', `data-resource-index="${index}"`)}
+                  ${renderRowAction('toggle-user-status', item.status === '启用' ? '⏸' : '▶', item.status === '启用' ? '停用用户' : '启用用户', `data-resource-index="${index}"`, 'muted')}
+                  ${renderRowAction('reset-user-password', '🔑', '重置密码', `data-resource-index="${index}"`, 'muted')}
                 </td>
               </tr>
             `).join('') || '<tr><td colspan="7">暂无匹配用户</td></tr>'}
@@ -6993,8 +7298,10 @@ function renderResourceTable() {
                 <td>${item.name}</td>
                 <td>${departmentMemberCount(item.name)} 人</td>
                 <td class="row-actions">
-                  <button class="ghost-btn" data-action="edit-resource" data-resource-index="${index}">编辑</button>
-                  <button class="danger-btn" data-action="delete-resource" data-resource-index="${index}" ${canDeleteDepartment(item) ? '' : 'disabled'}>${canDeleteDepartment(item) ? '删除' : '使用中'}</button>
+                  ${renderRowAction('edit-resource', '✎', '编辑部门', `data-resource-index="${index}"`)}
+                  ${canDeleteDepartment(item)
+                    ? renderRowAction('delete-resource', '🗑', '删除部门', `data-resource-index="${index}"`, 'danger')
+                    : renderDisabledRowAction('🔒', '使用中，不能删除')}
                 </td>
               </tr>
             `).join('') || '<tr><td colspan="3">暂无匹配部门</td></tr>'}
@@ -7018,8 +7325,10 @@ function renderResourceTable() {
                 <td>${roleAssignedUserCount(item.name) + projectRoleUsageCount(item.name)} 人</td>
                 <td><span class="badge ${item.status === '启用' ? 'done' : 'pending'}">${item.status}</span></td>
                 <td class="row-actions">
-                  <button class="ghost-btn" data-action="edit-resource" data-resource-index="${index}">编辑</button>
-                  <button class="danger-btn" data-action="delete-resource" data-resource-index="${index}" ${canDeleteRole(item) ? '' : 'disabled'}>${canDeleteRole(item) ? '删除' : '使用中'}</button>
+                  ${renderRowAction('edit-resource', '✎', '编辑角色', `data-resource-index="${index}"`)}
+                  ${canDeleteRole(item)
+                    ? renderRowAction('delete-resource', '🗑', '删除角色', `data-resource-index="${index}"`, 'danger')
+                    : renderDisabledRowAction('🔒', '使用中，不能删除')}
                 </td>
               </tr>
             `).join('') || '<tr><td colspan="6">暂无匹配角色</td></tr>'}
@@ -7069,8 +7378,10 @@ function renderResourceTable() {
                 <td><span class="badge ${customerLevelBadgeClass(item.level)}">${item.level || '-'}</span></td>
                 <td><span class="badge ${item.status === '合作中' ? 'done' : item.status === '潜在客户' ? 'progress' : 'pending'}">${item.status}</span></td>
                 <td class="row-actions">
-                  <button class="ghost-btn" data-action="edit-resource" data-resource-index="${index}">编辑</button>
-                  <button class="danger-btn" data-action="delete-resource" data-resource-index="${index}" ${canDeleteCustomer(item) ? '' : 'disabled'}>${canDeleteCustomer(item) ? '删除' : '使用中'}</button>
+                  ${renderRowAction('edit-resource', '✎', '编辑客户', `data-resource-index="${index}"`)}
+                  ${canDeleteCustomer(item)
+                    ? renderRowAction('delete-resource', '🗑', '删除客户', `data-resource-index="${index}"`, 'danger')
+                    : renderDisabledRowAction('🔒', '使用中，不能删除')}
                 </td>
               </tr>
             `).join('') || '<tr><td colspan="8">暂无匹配客户</td></tr>'}
@@ -7094,9 +7405,13 @@ function renderResourceTable() {
                 <td><span class="badge ${item.active ? 'done' : 'pending'}">${item.active ? '启用中' : '已停用'}</span></td>
                 <td>${customerLevelUsageCount(item.name)}</td>
                 <td class="row-actions">
-                  <button class="ghost-btn" data-action="edit-resource" data-resource-index="${index}">编辑</button>
-                  <button class="muted-btn" data-action="toggle-customer-level-option" data-level-option-index="${index}" ${canToggleCustomerLevelOption(item) ? '' : 'disabled'}>${canToggleCustomerLevelOption(item) ? (item.active ? '停用' : '启用') : '使用中'}</button>
-                  <button class="danger-btn" data-action="delete-resource" data-resource-index="${index}" ${canDeleteCustomerLevel(item) ? '' : 'disabled'}>${canDeleteCustomerLevel(item) ? '删除' : '使用中'}</button>
+                  ${renderRowAction('edit-resource', '✎', '编辑客户等级', `data-resource-index="${index}"`)}
+                  ${canToggleCustomerLevelOption(item)
+                    ? renderRowAction('toggle-customer-level-option', item.active ? '⏸' : '▶', item.active ? '停用客户等级' : '启用客户等级', `data-level-option-index="${index}"`, 'muted')
+                    : renderDisabledRowAction('🔒', '使用中，不能停用')}
+                  ${canDeleteCustomerLevel(item)
+                    ? renderRowAction('delete-resource', '🗑', '删除客户等级', `data-resource-index="${index}"`, 'danger')
+                    : renderDisabledRowAction('🔒', '使用中，不能删除')}
                 </td>
               </tr>
             `).join('') || '<tr><td colspan="4">暂无客户等级</td></tr>'}
@@ -7118,9 +7433,13 @@ function renderResourceTable() {
                 <td><span class="badge ${item.active ? 'done' : 'pending'}">${item.active ? '启用中' : '已停用'}</span></td>
                 <td>${orderTypeUsageCount(item.name)}</td>
                 <td class="row-actions">
-                  <button class="ghost-btn" data-action="edit-resource" data-resource-index="${index}">编辑</button>
-                  <button class="muted-btn" data-action="toggle-order-type-option" data-order-type-index="${index}" ${canToggleOrderTypeOption(item) ? '' : 'disabled'}>${canToggleOrderTypeOption(item) ? (item.active ? '停用' : '启用') : '使用中'}</button>
-                  <button class="danger-btn" data-action="delete-resource" data-resource-index="${index}" ${canDeleteOrderType(item) ? '' : 'disabled'}>${canDeleteOrderType(item) ? '删除' : '使用中'}</button>
+                  ${renderRowAction('edit-resource', '✎', '编辑订单类型', `data-resource-index="${index}"`)}
+                  ${canToggleOrderTypeOption(item)
+                    ? renderRowAction('toggle-order-type-option', item.active ? '⏸' : '▶', item.active ? '停用订单类型' : '启用订单类型', `data-order-type-index="${index}"`, 'muted')
+                    : renderDisabledRowAction('🔒', '使用中，不能停用')}
+                  ${canDeleteOrderType(item)
+                    ? renderRowAction('delete-resource', '🗑', '删除订单类型', `data-resource-index="${index}"`, 'danger')
+                    : renderDisabledRowAction('🔒', '使用中，不能删除')}
                 </td>
               </tr>
             `).join('') || '<tr><td colspan="4">暂无订单类型</td></tr>'}
@@ -7143,9 +7462,13 @@ function renderResourceTable() {
                 <td><span class="badge ${item.active ? 'done' : 'pending'}">${item.active ? '启用中' : '已停用'}</span></td>
                 <td>${orderStatusUsageCount(item.name)}</td>
                 <td class="row-actions">
-                  <button class="ghost-btn" data-action="edit-resource" data-resource-index="${index}">编辑</button>
-                  <button class="muted-btn" data-action="toggle-order-status-option" data-order-status-index="${index}" ${canToggleOrderStatusOption(item) ? '' : 'disabled'}>${canToggleOrderStatusOption(item) ? (item.active ? '停用' : '启用') : '使用中'}</button>
-                  <button class="danger-btn" data-action="delete-resource" data-resource-index="${index}" ${canDeleteOrderStatus(item) ? '' : 'disabled'}>${canDeleteOrderStatus(item) ? '删除' : '使用中'}</button>
+                  ${renderRowAction('edit-resource', '✎', '编辑订单状态', `data-resource-index="${index}"`)}
+                  ${canToggleOrderStatusOption(item)
+                    ? renderRowAction('toggle-order-status-option', item.active ? '⏸' : '▶', item.active ? '停用订单状态' : '启用订单状态', `data-order-status-index="${index}"`, 'muted')
+                    : renderDisabledRowAction('🔒', '使用中，不能停用')}
+                  ${canDeleteOrderStatus(item)
+                    ? renderRowAction('delete-resource', '🗑', '删除订单状态', `data-resource-index="${index}"`, 'danger')
+                    : renderDisabledRowAction('🔒', '使用中，不能删除')}
                 </td>
               </tr>
             `).join('') || '<tr><td colspan="5">暂无订单状态</td></tr>'}
@@ -7169,9 +7492,13 @@ function renderResourceTable() {
                   <td><span class="badge ${item.active ? 'done' : 'pending'}">${item.active ? '启用中' : '已停用'}</span></td>
                   <td>${taskStatusUsageCount(item.name)}</td>
                   <td class="row-actions">
-                    <button class="ghost-btn" data-action="edit-resource" data-resource-index="${index}">编辑</button>
-                    <button class="muted-btn" data-action="toggle-task-status-option" data-status-option-index="${index}" ${canToggleTaskStatusOption(item) ? '' : 'disabled'}>${canToggleTaskStatusOption(item) ? (item.active ? '停用' : '启用') : '使用中'}</button>
-                    <button class="danger-btn" data-action="delete-resource" data-resource-index="${index}" ${canDeleteTaskStatus(item) ? '' : 'disabled'}>${canDeleteTaskStatus(item) ? '删除' : '使用中'}</button>
+                    ${renderRowAction('edit-resource', '✎', '编辑任务状态', `data-resource-index="${index}"`)}
+                    ${canToggleTaskStatusOption(item)
+                      ? renderRowAction('toggle-task-status-option', item.active ? '⏸' : '▶', item.active ? '停用任务状态' : '启用任务状态', `data-status-option-index="${index}"`, 'muted')
+                      : renderDisabledRowAction('🔒', '使用中，不能停用')}
+                    ${canDeleteTaskStatus(item)
+                      ? renderRowAction('delete-resource', '🗑', '删除任务状态', `data-resource-index="${index}"`, 'danger')
+                      : renderDisabledRowAction('🔒', '使用中，不能删除')}
                   </td>
                 </tr>
               `).join('') || '<tr><td colspan="5">暂无任务状态</td></tr>'}
@@ -7203,7 +7530,7 @@ function renderResourceTable() {
                 <span>${transition.from}</span>
                 <strong>→</strong>
                 <span>${transition.to}</span>
-                <button class="muted-btn" data-action="delete-task-transition" data-transition-index="${index}">删除</button>
+                ${renderRowAction('delete-task-transition', '🗑', '删除流转关系', `data-transition-index="${index}"`, 'danger')}
               </div>
             `).join('') || '<p class="empty-note">暂无流转关系</p>'}
           </div>
@@ -7222,9 +7549,13 @@ function renderResourceTable() {
               <td>${item.name}</td>
               <td><span class="badge ${item.active ? 'done' : 'pending'}">${item.active ? '启用中' : '已停用'}</span></td>
               <td class="row-actions">
-                <button class="ghost-btn" data-action="edit-resource" data-resource-index="${index}">编辑</button>
-                <button class="muted-btn" data-action="toggle-customer-status-option" data-status-option-index="${index}" ${canToggleCustomerStatusOption(item) ? '' : 'disabled'}>${canToggleCustomerStatusOption(item) ? (item.active ? '停用' : '启用') : '使用中'}</button>
-                <button class="danger-btn" data-action="delete-resource" data-resource-index="${index}" ${canDeleteCustomerStatus(item) ? '' : 'disabled'}>${canDeleteCustomerStatus(item) ? '删除' : '使用中'}</button>
+                ${renderRowAction('edit-resource', '✎', '编辑客户项目状态', `data-resource-index="${index}"`)}
+                ${canToggleCustomerStatusOption(item)
+                  ? renderRowAction('toggle-customer-status-option', item.active ? '⏸' : '▶', item.active ? '停用客户项目状态' : '启用客户项目状态', `data-status-option-index="${index}"`, 'muted')
+                  : renderDisabledRowAction('🔒', '使用中，不能停用')}
+                ${canDeleteCustomerStatus(item)
+                  ? renderRowAction('delete-resource', '🗑', '删除客户项目状态', `data-resource-index="${index}"`, 'danger')
+                  : renderDisabledRowAction('🔒', '使用中，不能删除')}
               </td>
             </tr>
           `).join('') || '<tr><td colspan="3">暂无匹配状态</td></tr>'}
@@ -7254,7 +7585,7 @@ function renderResourceContent() {
         </select>
       ` : ''}
     </div>
-    ${resourceFormOpen && !isPermissionView ? renderFormModal(renderResourceForm(), 'wide') : ''}
+    ${resourceFormOpen && !isPermissionView ? renderFormModal(renderResourceForm(), 'wide', 'resource-form') : ''}
     <div id="resource-table-area">
       ${renderResourceTable()}
     </div>
@@ -8119,7 +8450,7 @@ function writeConfirmationConfig(action, actionTarget, overrides = {}) {
 
 function renderWriteConfirmation(config) {
   return `
-    <div id="write-confirmation-backdrop" class="modal-backdrop write-confirmation-backdrop">
+    <div id="write-confirmation-backdrop" class="modal-backdrop write-confirmation-backdrop" data-modal-key="write-confirmation">
       <section class="modal-card form-modal narrow">
         <div class="confirm-dialog">
           <div class="section-intro">
@@ -8741,6 +9072,15 @@ const realApiClickActions = new Set([
 
 document.addEventListener('input', (event) => {
   if (event.target.matches?.('input, textarea')) clearSingleValidationMark(event.target);
+  const permissionFilterContext = event.target.dataset?.permissionBulkFilter;
+  if (permissionFilterContext) {
+    const keyword = event.target.value.trim().toLowerCase();
+    document.querySelectorAll(`[data-permission-bulk="${permissionFilterContext}"]`).forEach((input) => {
+      const row = input.closest('.permission-checkbox-row');
+      const label = row?.dataset.permissionOptionLabel || '';
+      row?.classList.toggle('hidden-by-filter', Boolean(keyword) && !label.includes(keyword));
+    });
+  }
 });
 
 document.addEventListener('change', (event) => {
@@ -8770,6 +9110,8 @@ document.addEventListener('click', async (event) => {
   event.stopImmediatePropagation();
   try {
     await runConfirmedWriteAction(action, actionTarget);
+    const resetKey = modalDraftResetKeyForAction(action);
+    if (resetKey) clearModalDraft(resetKey);
   } catch (error) {
     reportBackendWriteError(action, error);
   }
@@ -8914,6 +9256,18 @@ document.addEventListener('change', async (event) => {
 
 
 document.addEventListener('click', async (event) => {
+  const clickedInsideModalCard = Boolean(event.target.closest?.('.modal-card'));
+  const writeConfirmationBackdrop = document.getElementById('write-confirmation-backdrop');
+  if (writeConfirmationBackdrop && !clickedInsideModalCard) {
+    closeWriteConfirmation(false);
+    return;
+  }
+  const activeBackdrop = document.querySelector('.modal-backdrop[data-modal-key]:not(#write-confirmation-backdrop)');
+  if (activeBackdrop && !clickedInsideModalCard) {
+    closeModalFromBackdrop(activeBackdrop);
+    return;
+  }
+
   const navTarget = event.target.closest('[data-view]');
   if (navTarget) {
     projectEditModalOpen = false;
@@ -8946,6 +9300,8 @@ document.addEventListener('click', async (event) => {
 
   const actionTarget = event.target.closest('[data-action]');
   const action = actionTarget?.dataset.action;
+  const resetModalKey = modalDraftResetKeyForAction(action);
+  if (resetModalKey && /^(cancel|close)/.test(action || '')) clearModalDraft(resetModalKey);
   const actionPermission = actionPermissionMap[action];
   if (actionPermission && !currentUserCan(actionPermission)) {
     showToast('当前账号没有该操作权限。', 'warning');
@@ -8994,6 +9350,7 @@ document.addEventListener('click', async (event) => {
     return;
   }
   if (action === 'close-readable-modal') {
+    clearModalDraftForAction(action);
     readableContentModal = null;
     renderGlobalModals();
   }
@@ -9052,6 +9409,7 @@ document.addEventListener('click', async (event) => {
     renderGlobalModals();
   }
   if (action === 'close-change-password') {
+    clearModalDraftForAction(action);
     changePasswordModalOpen = false;
     renderGlobalModals();
   }
@@ -9066,6 +9424,7 @@ document.addEventListener('click', async (event) => {
     ], { title: '请检查密码信息' })) return;
     try {
       await kpmApi.post('/api/iam/change-password', { account: currentAccount, oldPassword, newPassword });
+      clearModalDraftForAction(action);
       changePasswordModalOpen = false;
       renderGlobalModals();
       showToast('密码修改成功，请妥善保管新密码。', 'success');
@@ -9102,21 +9461,26 @@ document.addEventListener('click', async (event) => {
     saveMembersForContext(memberContext, members);
   }
   if (action === 'toggle-task-form') {
-    if (!taskFormOpen) resetTaskFormState();
+    if (taskFormOpen) clearModalDraftForAction(action);
+    else resetTaskFormState();
     taskFormOpen = !taskFormOpen;
     renderTaskManagement();
   }
   if (action === 'toggle-order-form') {
-    orderFormOpen = !(orderFormOpen && orderEditIndex === null);
+    const closingCreateOrderForm = orderFormOpen && orderEditIndex === null;
+    if (closingCreateOrderForm) clearModalDraftForAction(action);
+    orderFormOpen = !closingCreateOrderForm;
     orderEditIndex = null;
     renderOrderManagement();
   }
   if (action === 'cancel-order-form') {
+    clearModalDraftForAction(action);
     orderFormOpen = false;
     orderEditIndex = null;
     renderOrderManagement();
   }
   if (action === 'edit-order') {
+    clearModalDraft('order-form');
     orderFormOpen = true;
     orderEditIndex = Number(event.target.dataset.orderIndex);
     renderOrderManagement();
@@ -9181,6 +9545,7 @@ document.addEventListener('click', async (event) => {
     renderOrderManagement();
   }
   if (action === 'close-order-history') {
+    clearModalDraftForAction(action);
     orderHistoryModalOpen = false;
     selectedOrderId = null;
     renderOrderManagement();
@@ -9191,16 +9556,20 @@ document.addEventListener('click', async (event) => {
     renderOrderManagement();
   }
   if (action === 'close-order-detail') {
+    clearModalDraftForAction(action);
     orderDetailModalOpen = false;
     selectedOrderDetailId = null;
     renderOrderManagement();
   }
   if (action === 'toggle-customer-master-form') {
-    customerFormOpen = !(customerFormOpen && customerEditIndex === null);
+    const closingCreateCustomerForm = customerFormOpen && customerEditIndex === null;
+    if (closingCreateCustomerForm) clearModalDraftForAction(action);
+    customerFormOpen = !closingCreateCustomerForm;
     customerEditIndex = null;
     renderCustomerManagement();
   }
   if (action === 'cancel-customer-master-form') {
+    clearModalDraftForAction(action);
     customerFormOpen = false;
     customerEditIndex = null;
     renderCustomerManagement();
@@ -9272,6 +9641,7 @@ document.addEventListener('click', async (event) => {
     showView('project-detail');
   }
   if (action === 'toggle-customer-contact-form') {
+    if (customerContactFormOpen) clearModalDraftForAction(action);
     customerContactFormOpen = !customerContactFormOpen;
     renderCustomerDetail();
   }
@@ -9287,6 +9657,7 @@ document.addEventListener('click', async (event) => {
         remark: document.getElementById('customer-contact-remark').value.trim(),
       });
       customerContactFormOpen = false;
+      clearModalDraftForAction(action, 'customer-contact-form');
       renderCustomerDetail();
       renderCustomerManagement();
     }
@@ -9300,6 +9671,7 @@ document.addEventListener('click', async (event) => {
     renderGlobalModals();
   }
   if (action === 'toggle-customer-followup-form') {
+    if (customerFollowupFormOpen) clearModalDraftForAction(action);
     customerFollowupFormOpen = !customerFollowupFormOpen;
     renderCustomerDetail();
   }
@@ -9318,10 +9690,12 @@ document.addEventListener('click', async (event) => {
         attachments,
       });
       customerFollowupFormOpen = false;
+      clearModalDraftForAction(action, 'customer-followup-form');
       renderCustomerDetail();
     }
   }
   if (action === 'toggle-customer-order-form') {
+    if (customerOrderFormOpen) clearModalDraftForAction(action);
     customerOrderFormOpen = !customerOrderFormOpen;
     renderCustomerDetail();
   }
@@ -9335,6 +9709,7 @@ document.addEventListener('click', async (event) => {
       histories: [],
     });
     customerOrderFormOpen = false;
+    clearModalDraftForAction(action, 'customer-order-form');
     renderCustomerDetail();
     renderProjectDetail();
     renderProjectCustomers();
@@ -9365,6 +9740,7 @@ document.addEventListener('click', async (event) => {
         comments: [],
       });
       taskFormOpen = false;
+      clearModalDraftForAction(action, 'task-form');
       resetTaskFormState();
       renderTaskManagement();
     }
@@ -9374,6 +9750,7 @@ document.addEventListener('click', async (event) => {
     renderStageDetail();
   }
   if (action === 'close-stage-task-modal') {
+    clearModalDraftForAction(action);
     stageTaskFormOpen = false;
     renderStageDetail();
   }
@@ -9403,6 +9780,7 @@ document.addEventListener('click', async (event) => {
         comments: [],
       });
       stageTaskFormOpen = false;
+      clearModalDraftForAction(action, 'stage-task-form');
       renderTaskManagement();
       renderStageDetail();
     }
@@ -9471,6 +9849,7 @@ document.addEventListener('click', async (event) => {
     renderProjectDetail();
   }
   if (action === 'close-member-modal') {
+    clearModalDraftForAction(action);
     memberModalOpen = false;
     renderProjectDetail();
   }
@@ -9481,9 +9860,11 @@ document.addEventListener('click', async (event) => {
       project.managerAccount,
     );
     memberModalOpen = false;
+    clearModalDraftForAction(action, 'member-modal');
     renderProjectDetail();
   }
   if (action === 'close-blocker-help-modal') {
+    clearModalDraftForAction(action);
     blockerHelpFormOpen = false;
     renderStageDetail();
   }
@@ -9515,6 +9896,7 @@ document.addEventListener('click', async (event) => {
         comments: [],
       });
       blockerHelpFormOpen = false;
+      clearModalDraftForAction(action, 'blocker-help-form');
       renderTaskManagement();
       showView('tasks');
     }
@@ -9538,6 +9920,7 @@ document.addEventListener('click', async (event) => {
     renderTemplates();
   }
   if (action === 'cancel-template-form') {
+    clearModalDraftForAction(action);
     templateFormOpen = false;
     templateEditIndex = null;
     templateDraftStages = [];
@@ -9623,6 +10006,7 @@ document.addEventListener('click', async (event) => {
       templateEditIndex = null;
       templateDraftStages = [];
       templateDraftMeta = { name: '', scope: '', status: '草稿' };
+      clearModalDraftForAction(action, 'template-form');
       renderTemplates();
     }
   }
@@ -9633,6 +10017,7 @@ document.addEventListener('click', async (event) => {
     renderGlobalModals();
   }
   if (action === 'cancel-project-edit') {
+    clearModalDraftForAction(action);
     projectEditModalOpen = false;
     editingProjectId = null;
     renderGlobalModals();
@@ -9666,6 +10051,7 @@ document.addEventListener('click', async (event) => {
     selectedProjectId = project.id;
     projectEditModalOpen = false;
     editingProjectId = null;
+    clearModalDraftForAction(action, 'project-edit');
     refreshProjectRelatedSurfaces();
   }
   if (action === 'request-project-archive') {
@@ -9677,6 +10063,7 @@ document.addEventListener('click', async (event) => {
     if (project) openProjectDeleteConfirmation(project);
   }
   if (action === 'cancel-confirmation') {
+    clearModalDraftForAction(action);
     confirmationDialog = null;
     renderGlobalModals();
   }
@@ -9712,6 +10099,7 @@ document.addEventListener('click', async (event) => {
     renderProjectDetail();
   }
   if (action === 'close-project-sku-modal') {
+    clearModalDraftForAction(action);
     projectSkuModalOpen = false;
     projectSkuEditIndex = null;
     renderProjectDetail();
@@ -9725,6 +10113,7 @@ document.addEventListener('click', async (event) => {
     renderProjectDetail();
   }
   if (action === 'cancel-project-sku-edit') {
+    clearModalDraftForAction(action, 'project-sku');
     projectSkuEditIndex = null;
     renderProjectDetail();
   }
@@ -9736,6 +10125,7 @@ document.addEventListener('click', async (event) => {
       if (projectSkuEditIndex === 'new' || projectSkuEditIndex === null) project.skus.unshift({ id: `sku-${Date.now()}`, ...payload });
       else project.skus[projectSkuEditIndex] = { ...project.skus[projectSkuEditIndex], ...payload };
       projectSkuEditIndex = null;
+      clearModalDraftForAction(action, 'project-sku');
       renderProjectDetail();
     }
   }
@@ -9770,6 +10160,7 @@ document.addEventListener('click', async (event) => {
     showView('stage-detail');
   }
   if (action === 'toggle-project-customer-form') {
+    if (projectCustomerFormOpen) clearModalDraftForAction(action);
     projectCustomerFormOpen = !projectCustomerFormOpen;
     renderProjectCustomers();
   }
@@ -9795,19 +10186,22 @@ document.addEventListener('click', async (event) => {
   }
   if (action === 'open-resource-create') {
     if (selectedResourceTab === 'permissions') return;
-    permissionPickerDrafts = {};
-    resourceFormOpen = !(resourceFormOpen && resourceEditIndex === null);
+    const closingCreateResourceForm = resourceFormOpen && resourceEditIndex === null;
+    if (closingCreateResourceForm) clearModalDraftForAction(action, 'resource-form');
+    if (!modalFormDrafts['resource-form']) permissionPickerDrafts = {};
+    resourceFormOpen = !closingCreateResourceForm;
     resourceEditIndex = null;
     renderResourceContent();
   }
   if (action === 'cancel-resource-form') {
+    clearModalDraftForAction(action);
     permissionPickerDrafts = {};
     resourceFormOpen = false;
     resourceEditIndex = null;
     renderResourceContent();
   }
   if (action === 'edit-resource') {
-    permissionPickerDrafts = {};
+    if (!modalFormDrafts['resource-form']) permissionPickerDrafts = {};
     resourceFormOpen = true;
     resourceEditIndex = Number(event.target.dataset.resourceIndex);
     renderResourceContent();
@@ -9835,14 +10229,13 @@ document.addEventListener('click', async (event) => {
   }
   if (action === 'add-multiple-permission-selection') {
     const context = actionTarget.dataset.permissionContext;
-    const select = document.getElementById(`${permissionPickerInputId(context)}-multi`);
     const selected = collectPermissionSelections(context);
-    const added = [...(select?.selectedOptions || [])].map((option) => option.value);
+    const added = [...document.querySelectorAll(`[data-permission-bulk="${context}"]:checked`)].map((input) => input.value);
     if (added.length) {
       permissionPickerDrafts[context] = uniquePermissionKeys([...selected, ...added]);
       renderResourceContent();
     } else {
-      showToast('请先在列表中选择一个或多个权限。', 'warning');
+      showToast('请先勾选一个或多个权限。', 'warning');
     }
   }
   if (action === 'remove-permission-selection') {
@@ -10052,6 +10445,7 @@ document.addEventListener('click', async (event) => {
       resourceFormOpen = false;
       resourceEditIndex = null;
       permissionPickerDrafts = {};
+      clearModalDraftForAction(action, 'resource-form');
       renderResourceContent();
       if (['customer-statuses', 'customer-levels', 'order-types', 'order-statuses'].includes(selectedResourceTab)) {
         renderProjectCustomers();
@@ -10092,6 +10486,7 @@ document.addEventListener('click', async (event) => {
     renderResourceContent();
   }
   if (action === 'toggle-task-transition-form') {
+    if (taskTransitionFormOpen) clearModalDraftForAction(action);
     taskTransitionFormOpen = !taskTransitionFormOpen;
     renderResourceContent();
   }
@@ -10102,6 +10497,7 @@ document.addEventListener('click', async (event) => {
       taskStatusTransitions.push({ from, to });
     }
     taskTransitionFormOpen = false;
+    clearModalDraftForAction(action, 'task-transition-form');
     renderResourceContent();
   }
   if (action === 'delete-task-transition') {
@@ -10138,6 +10534,7 @@ document.addEventListener('click', async (event) => {
     }
   }
   if (action === 'toggle-requirement-form') {
+    if (requirementFormOpen) clearModalDraftForAction(action);
     requirementFormOpen = !requirementFormOpen;
     renderCustomerRequirements();
   }
@@ -10195,6 +10592,7 @@ document.addEventListener('click', async (event) => {
         renderTaskManagement();
       }
       requirementFormOpen = false;
+      clearModalDraftForAction(action, 'requirement-form');
       renderCustomerRequirements();
     }
   }
@@ -10221,6 +10619,7 @@ document.addEventListener('click', async (event) => {
 
   const tab = event.target.closest('[data-tab]');
   if (tab) {
+    clearModalDraft('resource-form');
     selectedResourceTab = tab.dataset.tab;
     resourceFormOpen = false;
     resourceEditIndex = null;
@@ -10251,6 +10650,7 @@ document.addEventListener('click', async (event) => {
     renderCustomerActivityAnalytics();
   }
   if (action === 'close-activity-cell') {
+    clearModalDraftForAction(action, 'activity-cell');
     selectedActivityCell = null;
     renderCustomerActivityAnalytics();
   }
@@ -10259,6 +10659,7 @@ document.addEventListener('click', async (event) => {
     renderResourceAnalytics();
   }
   if (action === 'close-resource-map-fullscreen') {
+    clearModalDraftForAction(action);
     mapFullscreenOpen = false;
     renderResourceAnalytics();
   }
@@ -10385,6 +10786,7 @@ document.addEventListener('input', (event) => {
     renderTaskManagement();
   }
   if (event.target.id === 'order-keyword') {
+    orderListFilters.keyword = event.target.value;
     renderOrderManagement();
   }
   if (event.target.id === 'customer-master-keyword') {
@@ -10455,6 +10857,18 @@ document.addEventListener('change', (event) => {
   if (event.target.id === 'task-category-filter') {
     taskListFilters.category = event.target.value;
     renderTaskManagement();
+  }
+  if (event.target.id === 'order-type-filter') {
+    orderListFilters.type = event.target.value;
+    renderOrderManagement();
+  }
+  if (event.target.id === 'order-status-filter') {
+    orderListFilters.status = event.target.value;
+    renderOrderManagement();
+  }
+  if (event.target.id === 'order-project-filter') {
+    orderListFilters.project = event.target.value;
+    renderOrderManagement();
   }
   if (event.target.id === 'analytics-period') {
     analyticsOrderPeriod = event.target.value;

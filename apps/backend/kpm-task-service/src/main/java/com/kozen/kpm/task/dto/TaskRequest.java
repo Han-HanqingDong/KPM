@@ -5,9 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 @Schema(description = "任务保存请求")
 public record TaskRequest(
@@ -49,25 +47,12 @@ public record TaskRequest(
 ) {
     public List<String> safeAssignees() { return assignees == null ? List.of() : assignees; }
     public List<String> safeParticipants() { return participants == null ? List.of() : participants; }
+    public String normalizedExpectedCompletionAt() { return blankToNull(expectedCompletionAt); }
+    public String normalizedDueDate() { return blankToNull(dueDate); }
+    public String normalizedSource() { return source == null || source.isBlank() ? "任务管理" : source.trim(); }
+    public boolean normalizedBlocked() { return blocked != null && blocked; }
 
-    public Map<String, Object> toMap() {
-        Map<String, Object> map = new LinkedHashMap<>();
-        map.put("id", id);
-        map.put("title", title);
-        map.put("description", description);
-        map.put("projectId", projectId);
-        map.put("stageId", stageId);
-        map.put("customerId", customerId);
-        map.put("category", category);
-        map.put("status", status);
-        map.put("priority", priority);
-        map.put("creator", creator);
-        map.put("expectedCompletionAt", expectedCompletionAt == null || expectedCompletionAt.isBlank() ? null : expectedCompletionAt);
-        map.put("dueDate", dueDate == null || dueDate.isBlank() ? null : dueDate);
-        map.put("source", source == null || source.isBlank() ? "任务管理" : source);
-        map.put("blocked", blocked != null && blocked);
-        map.put("assignees", safeAssignees());
-        map.put("participants", safeParticipants());
-        return map;
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }

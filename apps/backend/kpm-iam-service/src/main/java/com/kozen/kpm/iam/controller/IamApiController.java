@@ -1,15 +1,15 @@
 package com.kozen.kpm.iam.controller;
 
 import com.kozen.kpm.common.api.ApiResponse;
+import com.kozen.kpm.iam.dto.AuthenticatedUserDto;
 import com.kozen.kpm.iam.dto.ChangePasswordRequest;
+import com.kozen.kpm.iam.dto.LoginResponseDto;
 import com.kozen.kpm.iam.dto.LoginRequest;
 import com.kozen.kpm.iam.service.IamService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/iam")
@@ -22,7 +22,7 @@ public class IamApiController {
 
     @PostMapping("/login")
     @Operation(summary = "登录", description = "校验账号密码，返回开发阶段 token 和用户信息。")
-    public ApiResponse<Map<String, Object>> login(@Valid @RequestBody LoginRequest request) {
+    public ApiResponse<LoginResponseDto> login(@Valid @RequestBody LoginRequest request) {
         try {
             return ApiResponse.ok(iamService.login(request));
         } catch (IllegalArgumentException e) {
@@ -32,7 +32,7 @@ public class IamApiController {
 
     @GetMapping("/me")
     @Operation(summary = "当前用户", description = "按账号查询用户部门、角色和有效权限。")
-    public ApiResponse<Map<String, Object>> me(
+    public ApiResponse<AuthenticatedUserDto> me(
             @RequestHeader(value = "X-KPM-Account", required = false) String headerAccount,
             @RequestParam(required = false) String account
     ) {

@@ -1,12 +1,18 @@
 package com.kozen.kpm.resource.controller;
 
 import com.kozen.kpm.common.api.ApiResponse;
+import com.kozen.kpm.resource.dto.DepartmentDto;
 import com.kozen.kpm.resource.dto.DepartmentRequest;
+import com.kozen.kpm.resource.dto.EnumItemDto;
 import com.kozen.kpm.resource.dto.EnumItemRequest;
 import com.kozen.kpm.resource.dto.PrototypeStateRequest;
+import com.kozen.kpm.resource.dto.ResourceBootstrapDto;
+import com.kozen.kpm.resource.dto.RoleDto;
 import com.kozen.kpm.resource.dto.RoleRequest;
+import com.kozen.kpm.resource.dto.TaskStatusTransitionDto;
 import com.kozen.kpm.resource.dto.TaskStatusTransitionRequest;
 import com.kozen.kpm.resource.dto.UserRequest;
+import com.kozen.kpm.resource.dto.UserResourceDto;
 import com.kozen.kpm.resource.service.ResourceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -14,7 +20,6 @@ import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/resources")
@@ -29,7 +34,7 @@ public class ResourceApiController {
 
     @GetMapping("/bootstrap")
     @Operation(summary = "获取资源启动数据", description = "返回用户、部门、角色、权限、枚举和任务状态流转。")
-    public ApiResponse<Map<String, Object>> bootstrap() {
+    public ApiResponse<ResourceBootstrapDto> bootstrap() {
         return ApiResponse.ok(resourceService.bootstrap());
     }
 
@@ -47,25 +52,25 @@ public class ResourceApiController {
 
     @GetMapping("/users")
     @Operation(summary = "查询用户列表")
-    public ApiResponse<List<Map<String, Object>>> users() {
+    public ApiResponse<List<UserResourceDto>> users() {
         return ApiResponse.ok(resourceService.users());
     }
 
     @PostMapping("/users")
     @Operation(summary = "新增用户")
-    public ApiResponse<Map<String, Object>> createUser(@Valid @RequestBody UserRequest request) {
+    public ApiResponse<UserResourceDto> createUser(@Valid @RequestBody UserRequest request) {
         return ApiResponse.ok(resourceService.createUser(request));
     }
 
     @PutMapping("/users/{id}")
     @Operation(summary = "修改用户")
-    public ApiResponse<Map<String, Object>> updateUser(@PathVariable String id, @Valid @RequestBody UserRequest request) {
+    public ApiResponse<UserResourceDto> updateUser(@PathVariable String id, @Valid @RequestBody UserRequest request) {
         return ApiResponse.ok(resourceService.updateUser(id, request));
     }
 
     @PostMapping("/users/{id}/reset-password")
     @Operation(summary = "重置用户密码", description = "管理员将用户密码重置为系统默认密码。")
-    public ApiResponse<Map<String, Object>> resetUserPassword(@PathVariable String id) {
+    public ApiResponse<UserResourceDto> resetUserPassword(@PathVariable String id) {
         return ApiResponse.ok(resourceService.resetUserPassword(id));
     }
 
@@ -77,19 +82,19 @@ public class ResourceApiController {
 
     @GetMapping("/departments")
     @Operation(summary = "查询部门列表", description = "部门为平铺结构，人数由用户-部门关系自动统计。")
-    public ApiResponse<List<Map<String, Object>>> departments() {
+    public ApiResponse<List<DepartmentDto>> departments() {
         return ApiResponse.ok(resourceService.departments());
     }
 
     @PostMapping("/departments")
     @Operation(summary = "新增部门")
-    public ApiResponse<Map<String, Object>> createDepartment(@Valid @RequestBody DepartmentRequest request) {
+    public ApiResponse<DepartmentDto> createDepartment(@Valid @RequestBody DepartmentRequest request) {
         return ApiResponse.ok(resourceService.createDepartment(request));
     }
 
     @PutMapping("/departments/{id}")
     @Operation(summary = "修改部门")
-    public ApiResponse<Map<String, Object>> updateDepartment(@PathVariable String id, @Valid @RequestBody DepartmentRequest request) {
+    public ApiResponse<DepartmentDto> updateDepartment(@PathVariable String id, @Valid @RequestBody DepartmentRequest request) {
         return ApiResponse.ok(resourceService.updateDepartment(id, request));
     }
 
@@ -101,19 +106,19 @@ public class ResourceApiController {
 
     @GetMapping("/roles")
     @Operation(summary = "查询角色列表")
-    public ApiResponse<List<Map<String, Object>>> roles() {
+    public ApiResponse<List<RoleDto>> roles() {
         return ApiResponse.ok(resourceService.roles());
     }
 
     @PostMapping("/roles")
     @Operation(summary = "新增角色")
-    public ApiResponse<Map<String, Object>> createRole(@Valid @RequestBody RoleRequest request) {
+    public ApiResponse<RoleDto> createRole(@Valid @RequestBody RoleRequest request) {
         return ApiResponse.ok(resourceService.createRole(request));
     }
 
     @PutMapping("/roles/{id}")
     @Operation(summary = "修改角色")
-    public ApiResponse<Map<String, Object>> updateRole(@PathVariable String id, @Valid @RequestBody RoleRequest request) {
+    public ApiResponse<RoleDto> updateRole(@PathVariable String id, @Valid @RequestBody RoleRequest request) {
         return ApiResponse.ok(resourceService.updateRole(id, request));
     }
 
@@ -125,13 +130,13 @@ public class ResourceApiController {
 
     @PostMapping("/enums")
     @Operation(summary = "新增枚举值")
-    public ApiResponse<Map<String, Object>> createEnum(@Valid @RequestBody EnumItemRequest request) {
+    public ApiResponse<EnumItemDto> createEnum(@Valid @RequestBody EnumItemRequest request) {
         return ApiResponse.ok(resourceService.createEnum(request));
     }
 
     @PutMapping("/enums/{id}")
     @Operation(summary = "修改枚举值")
-    public ApiResponse<Map<String, Object>> updateEnum(@PathVariable String id, @Valid @RequestBody EnumItemRequest request) {
+    public ApiResponse<EnumItemDto> updateEnum(@PathVariable String id, @Valid @RequestBody EnumItemRequest request) {
         return ApiResponse.ok(resourceService.updateEnum(id, request));
     }
 
@@ -143,7 +148,7 @@ public class ResourceApiController {
 
     @PostMapping("/task-status-transitions")
     @Operation(summary = "新增任务状态流转", description = "配置任务从一个状态允许流转到另一个状态。")
-    public ApiResponse<Map<String, Object>> createTaskStatusTransition(@Valid @RequestBody TaskStatusTransitionRequest request) {
+    public ApiResponse<TaskStatusTransitionDto> createTaskStatusTransition(@Valid @RequestBody TaskStatusTransitionRequest request) {
         return ApiResponse.ok(resourceService.createTaskStatusTransition(request));
     }
 
