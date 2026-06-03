@@ -49,7 +49,7 @@ CREATE TABLE kpm_departments (
 CREATE TABLE kpm_users (
   id TEXT PRIMARY KEY,
   account TEXT NOT NULL UNIQUE,
-  email TEXT,
+  email TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL,
   password_hash TEXT NOT NULL DEFAULT '{noop}123456',
   status TEXT NOT NULL DEFAULT '启用',

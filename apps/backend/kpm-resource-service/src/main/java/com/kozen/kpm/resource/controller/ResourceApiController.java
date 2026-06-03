@@ -1,9 +1,16 @@
 package com.kozen.kpm.resource.controller;
 
 import com.kozen.kpm.common.api.ApiResponse;
+import com.kozen.kpm.resource.dto.DepartmentRequest;
+import com.kozen.kpm.resource.dto.EnumItemRequest;
+import com.kozen.kpm.resource.dto.PrototypeStateRequest;
+import com.kozen.kpm.resource.dto.RoleRequest;
+import com.kozen.kpm.resource.dto.TaskStatusTransitionRequest;
+import com.kozen.kpm.resource.dto.UserRequest;
 import com.kozen.kpm.resource.service.ResourceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -34,8 +41,8 @@ public class ResourceApiController {
 
     @PostMapping("/prototype-state")
     @Operation(summary = "保存原型试用状态", description = "将当前原型 UI 状态持久化到 PostgreSQL。")
-    public ApiResponse<Boolean> savePrototypeState(@RequestBody Map<String, Object> body) {
-        return ApiResponse.ok(resourceService.savePrototypeState(body));
+    public ApiResponse<Boolean> savePrototypeState(@RequestBody PrototypeStateRequest request) {
+        return ApiResponse.ok(resourceService.savePrototypeState(request));
     }
 
     @GetMapping("/users")
@@ -46,14 +53,14 @@ public class ResourceApiController {
 
     @PostMapping("/users")
     @Operation(summary = "新增用户")
-    public ApiResponse<Map<String, Object>> createUser(@RequestBody Map<String, Object> body) {
-        return ApiResponse.ok(resourceService.createUser(body));
+    public ApiResponse<Map<String, Object>> createUser(@Valid @RequestBody UserRequest request) {
+        return ApiResponse.ok(resourceService.createUser(request));
     }
 
     @PutMapping("/users/{id}")
     @Operation(summary = "修改用户")
-    public ApiResponse<Map<String, Object>> updateUser(@PathVariable String id, @RequestBody Map<String, Object> body) {
-        return ApiResponse.ok(resourceService.updateUser(id, body));
+    public ApiResponse<Map<String, Object>> updateUser(@PathVariable String id, @Valid @RequestBody UserRequest request) {
+        return ApiResponse.ok(resourceService.updateUser(id, request));
     }
 
     @PostMapping("/users/{id}/reset-password")
@@ -76,14 +83,14 @@ public class ResourceApiController {
 
     @PostMapping("/departments")
     @Operation(summary = "新增部门")
-    public ApiResponse<Map<String, Object>> createDepartment(@RequestBody Map<String, Object> body) {
-        return ApiResponse.ok(resourceService.createDepartment(body));
+    public ApiResponse<Map<String, Object>> createDepartment(@Valid @RequestBody DepartmentRequest request) {
+        return ApiResponse.ok(resourceService.createDepartment(request));
     }
 
     @PutMapping("/departments/{id}")
     @Operation(summary = "修改部门")
-    public ApiResponse<Map<String, Object>> updateDepartment(@PathVariable String id, @RequestBody Map<String, Object> body) {
-        return ApiResponse.ok(resourceService.updateDepartment(id, body));
+    public ApiResponse<Map<String, Object>> updateDepartment(@PathVariable String id, @Valid @RequestBody DepartmentRequest request) {
+        return ApiResponse.ok(resourceService.updateDepartment(id, request));
     }
 
     @DeleteMapping("/departments/{id}")
@@ -100,14 +107,14 @@ public class ResourceApiController {
 
     @PostMapping("/roles")
     @Operation(summary = "新增角色")
-    public ApiResponse<Map<String, Object>> createRole(@RequestBody Map<String, Object> body) {
-        return ApiResponse.ok(resourceService.createRole(body));
+    public ApiResponse<Map<String, Object>> createRole(@Valid @RequestBody RoleRequest request) {
+        return ApiResponse.ok(resourceService.createRole(request));
     }
 
     @PutMapping("/roles/{id}")
     @Operation(summary = "修改角色")
-    public ApiResponse<Map<String, Object>> updateRole(@PathVariable String id, @RequestBody Map<String, Object> body) {
-        return ApiResponse.ok(resourceService.updateRole(id, body));
+    public ApiResponse<Map<String, Object>> updateRole(@PathVariable String id, @Valid @RequestBody RoleRequest request) {
+        return ApiResponse.ok(resourceService.updateRole(id, request));
     }
 
     @DeleteMapping("/roles/{id}")
@@ -118,14 +125,14 @@ public class ResourceApiController {
 
     @PostMapping("/enums")
     @Operation(summary = "新增枚举值")
-    public ApiResponse<Map<String, Object>> createEnum(@RequestBody Map<String, Object> body) {
-        return ApiResponse.ok(resourceService.createEnum(body));
+    public ApiResponse<Map<String, Object>> createEnum(@Valid @RequestBody EnumItemRequest request) {
+        return ApiResponse.ok(resourceService.createEnum(request));
     }
 
     @PutMapping("/enums/{id}")
     @Operation(summary = "修改枚举值")
-    public ApiResponse<Map<String, Object>> updateEnum(@PathVariable String id, @RequestBody Map<String, Object> body) {
-        return ApiResponse.ok(resourceService.updateEnum(id, body));
+    public ApiResponse<Map<String, Object>> updateEnum(@PathVariable String id, @Valid @RequestBody EnumItemRequest request) {
+        return ApiResponse.ok(resourceService.updateEnum(id, request));
     }
 
     @DeleteMapping("/enums/{id}")
@@ -136,8 +143,8 @@ public class ResourceApiController {
 
     @PostMapping("/task-status-transitions")
     @Operation(summary = "新增任务状态流转", description = "配置任务从一个状态允许流转到另一个状态。")
-    public ApiResponse<Map<String, Object>> createTaskStatusTransition(@RequestBody Map<String, Object> body) {
-        return ApiResponse.ok(resourceService.createTaskStatusTransition(body));
+    public ApiResponse<Map<String, Object>> createTaskStatusTransition(@Valid @RequestBody TaskStatusTransitionRequest request) {
+        return ApiResponse.ok(resourceService.createTaskStatusTransition(request));
     }
 
     @DeleteMapping("/task-status-transitions/{id}")

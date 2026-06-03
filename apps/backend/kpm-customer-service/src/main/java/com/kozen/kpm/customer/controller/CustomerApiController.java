@@ -1,9 +1,14 @@
 package com.kozen.kpm.customer.controller;
 
 import com.kozen.kpm.common.api.ApiResponse;
+import com.kozen.kpm.common.dto.FileMetadataRequest;
+import com.kozen.kpm.customer.dto.CustomerContactRequest;
+import com.kozen.kpm.customer.dto.CustomerFollowupRequest;
+import com.kozen.kpm.customer.dto.CustomerRequest;
 import com.kozen.kpm.customer.service.CustomerService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -34,14 +39,14 @@ public class CustomerApiController {
 
     @PostMapping
     @Operation(summary = "新增客户", description = "新增客户并配置负责销售与技术支持人员。")
-    public ApiResponse<Map<String, Object>> create(@RequestBody Map<String, Object> body) {
-        return ApiResponse.ok(customerService.create(body));
+    public ApiResponse<Map<String, Object>> create(@Valid @RequestBody CustomerRequest request) {
+        return ApiResponse.ok(customerService.create(request));
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "修改客户", description = "修改客户基础资料并同步负责人绑定关系。")
-    public ApiResponse<Map<String, Object>> update(@PathVariable String id, @RequestBody Map<String, Object> body) {
-        return ApiResponse.ok(customerService.update(id, body));
+    public ApiResponse<Map<String, Object>> update(@PathVariable String id, @Valid @RequestBody CustomerRequest request) {
+        return ApiResponse.ok(customerService.update(id, request));
     }
 
     @DeleteMapping("/{id}")
@@ -52,8 +57,8 @@ public class CustomerApiController {
 
     @PostMapping("/{id}/contacts")
     @Operation(summary = "新增客户联系人", description = "为客户新增一个联系人。")
-    public ApiResponse<Map<String, Object>> addContact(@PathVariable String id, @RequestBody Map<String, Object> body) {
-        return ApiResponse.ok(customerService.addContact(id, body));
+    public ApiResponse<Map<String, Object>> addContact(@PathVariable String id, @Valid @RequestBody CustomerContactRequest request) {
+        return ApiResponse.ok(customerService.addContact(id, request));
     }
 
     @DeleteMapping("/{id}/contacts/{contactId}")
@@ -64,13 +69,13 @@ public class CustomerApiController {
 
     @PostMapping("/{id}/followups")
     @Operation(summary = "新增客户跟进记录", description = "以留言或附件记录客户跟进过程。")
-    public ApiResponse<Map<String, Object>> addFollowup(@PathVariable String id, @RequestBody Map<String, Object> body) {
-        return ApiResponse.ok(customerService.addFollowup(id, body));
+    public ApiResponse<Map<String, Object>> addFollowup(@PathVariable String id, @Valid @RequestBody CustomerFollowupRequest request) {
+        return ApiResponse.ok(customerService.addFollowup(id, request));
     }
 
     @PostMapping("/{id}/materials")
     @Operation(summary = "新增客户资料", description = "记录客户资料库中的文件元数据，后续可接入 OSS 文件存储。")
-    public ApiResponse<Map<String, Object>> addMaterial(@PathVariable String id, @RequestBody Map<String, Object> body) {
-        return ApiResponse.ok(customerService.addMaterial(id, body));
+    public ApiResponse<Map<String, Object>> addMaterial(@PathVariable String id, @Valid @RequestBody FileMetadataRequest request) {
+        return ApiResponse.ok(customerService.addMaterial(id, request));
     }
 }

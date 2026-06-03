@@ -2,6 +2,8 @@ package com.kozen.kpm.iam.service.impl;
 
 import com.kozen.kpm.common.auth.AuthTokenUtil;
 import com.kozen.kpm.common.util.ValidationUtil;
+import com.kozen.kpm.iam.dto.ChangePasswordRequest;
+import com.kozen.kpm.iam.dto.LoginRequest;
 import com.kozen.kpm.iam.mapper.IamMapper;
 import com.kozen.kpm.iam.service.IamService;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,9 +31,9 @@ public class IamServiceImpl implements IamService {
     }
 
     @Override
-    public Map<String, Object> login(Map<String, Object> body) {
-        String account = ValidationUtil.requireAccount(body, "account", "账号");
-        String password = ValidationUtil.requireText(body, "password", "密码", 128);
+    public Map<String, Object> login(LoginRequest request) {
+        String account = ValidationUtil.requireEmail(request.account(), "登录邮箱");
+        String password = ValidationUtil.requireText(request.password(), "密码", 128);
         List<Map<String, Object>> users = iamMapper.findUserForLogin(account);
         if (users.isEmpty() || !String.valueOf(users.getFirst().get("passwordHash")).endsWith(password) || !"启用".equals(users.getFirst().get("status"))) {
             throw new IllegalArgumentException("账号或密码不正确");
@@ -47,7 +49,7 @@ public class IamServiceImpl implements IamService {
 
     @Override
     public Map<String, Object> me(String account) {
-        ValidationUtil.requireText(account, "账号", 64);
+        ValidationUtil.requireEmail(account, "登录邮箱");
         List<Map<String, Object>> users = iamMapper.findUser(account);
         if (users.isEmpty()) {
             throw new IllegalArgumentException("用户不存在");
@@ -56,13 +58,10 @@ public class IamServiceImpl implements IamService {
     }
 
     @Override
-    public boolean changePassword(Map<String, Object> body) {
-        String account = ValidationUtil.requireAccount(body, "account", "账号");
-        String oldPassword = ValidationUtil.requireText(body, "oldPassword", "原密码", 128);
-        String newPassword = ValidationUtil.requireText(body, "newPassword", "新密码", 128);
-        if (newPassword.length() < 6) {
-            throw new IllegalArgumentException("新密码至少需要 6 位");
-        }
+    public boolean changePassword(ChangePasswordRequest request) {
+        String account = ValidationUtil.requireEmail(request.account(), "登录邮箱");
+        String oldPassword = ValidationUtil.requireText(request.oldPassword(), "原密码", 128);
+        String newPassword = ValidationUtil.requireText(request.newPassword(), "新密码", 128);
         List<Map<String, Object>> users = iamMapper.findUserForLogin(account);
         if (users.isEmpty() || !passwordMatches(String.valueOf(users.getFirst().get("passwordHash")), oldPassword)) {
             throw new IllegalArgumentException("原密码不正确");

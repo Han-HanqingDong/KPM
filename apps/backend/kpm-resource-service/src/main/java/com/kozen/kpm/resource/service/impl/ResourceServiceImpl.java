@@ -2,7 +2,12 @@ package com.kozen.kpm.resource.service.impl;
 
 import com.kozen.kpm.common.util.IdUtil;
 import com.kozen.kpm.common.util.JsonUtil;
-import com.kozen.kpm.common.util.ValidationUtil;
+import com.kozen.kpm.resource.dto.DepartmentRequest;
+import com.kozen.kpm.resource.dto.EnumItemRequest;
+import com.kozen.kpm.resource.dto.PrototypeStateRequest;
+import com.kozen.kpm.resource.dto.RoleRequest;
+import com.kozen.kpm.resource.dto.TaskStatusTransitionRequest;
+import com.kozen.kpm.resource.dto.UserRequest;
 import com.kozen.kpm.resource.mapper.ResourceMapper;
 import com.kozen.kpm.resource.service.ResourceService;
 import org.springframework.stereotype.Service;
@@ -44,9 +49,9 @@ public class ResourceServiceImpl implements ResourceService {
     }
 
     @Override
-    public boolean savePrototypeState(Map<String, Object> body) {
-        Object state = body.getOrDefault("state", Map.of());
-        String updatedBy = String.valueOf(body.getOrDefault("updatedBy", "prototype"));
+    public boolean savePrototypeState(PrototypeStateRequest request) {
+        Object state = request == null || request.state() == null ? Map.of() : request.state();
+        String updatedBy = request == null || request.updatedBy() == null || request.updatedBy().isBlank() ? "prototype" : request.updatedBy().trim();
         resourceMapper.upsertPrototypeSnapshot(JsonUtil.toJson(state), updatedBy);
         return true;
     }
@@ -60,12 +65,10 @@ public class ResourceServiceImpl implements ResourceService {
 
     @Override
     @Transactional
-    public Map<String, Object> createUser(Map<String, Object> body) {
-        normalizeUserEmail(body);
-        validateUser(body);
-        String id = id("user", body.get("account"));
-        resourceMapper.insertUser(id, body);
-        replaceUserRelations(id, body);
+    public Map<String, Object> createUser(UserRequest request) {
+        String id = id("user", request.loginAccount());
+        resourceMapper.insertUser(id, request);
+        replaceUserRelations(id, request);
         Map<String, Object> user = getUser(id);
         user.put("defaultPassword", DEFAULT_INITIAL_PASSWORD);
         return user;
@@ -73,11 +76,9 @@ public class ResourceServiceImpl implements ResourceService {
 
     @Override
     @Transactional
-    public Map<String, Object> updateUser(String id, Map<String, Object> body) {
-        normalizeUserEmail(body);
-        validateUser(body);
-        resourceMapper.updateUser(id, body);
-        replaceUserRelations(id, body);
+    public Map<String, Object> updateUser(String id, UserRequest request) {
+        resourceMapper.updateUser(id, request);
+        replaceUserRelations(id, request);
         return getUser(id);
     }
 
@@ -101,17 +102,15 @@ public class ResourceServiceImpl implements ResourceService {
     }
 
     @Override
-    public Map<String, Object> createDepartment(Map<String, Object> body) {
-        validateDepartment(body);
-        String id = id("dept", body.get("name"));
-        resourceMapper.insertDepartment(id, body);
+    public Map<String, Object> createDepartment(DepartmentRequest request) {
+        String id = id("dept", request.name());
+        resourceMapper.insertDepartment(id, request);
         return resourceMapper.department(id);
     }
 
     @Override
-    public Map<String, Object> updateDepartment(String id, Map<String, Object> body) {
-        validateDepartment(body);
-        resourceMapper.updateDepartment(id, body);
+    public Map<String, Object> updateDepartment(String id, DepartmentRequest request) {
+        resourceMapper.updateDepartment(id, request);
         return resourceMapper.department(id);
     }
 
@@ -130,20 +129,18 @@ public class ResourceServiceImpl implements ResourceService {
 
     @Override
     @Transactional
-    public Map<String, Object> createRole(Map<String, Object> body) {
-        validateRole(body);
-        String id = id("role", body.get("name"));
-        resourceMapper.insertRole(id, body);
-        replaceRolePermissions(id, body);
+    public Map<String, Object> createRole(RoleRequest request) {
+        String id = id("role", request.name());
+        resourceMapper.insertRole(id, request);
+        replaceRolePermissions(id, request);
         return resourceMapper.role(id);
     }
 
     @Override
     @Transactional
-    public Map<String, Object> updateRole(String id, Map<String, Object> body) {
-        validateRole(body);
-        resourceMapper.updateRole(id, body);
-        replaceRolePermissions(id, body);
+    public Map<String, Object> updateRole(String id, RoleRequest request) {
+        resourceMapper.updateRole(id, request);
+        replaceRolePermissions(id, request);
         return resourceMapper.role(id);
     }
 
@@ -154,17 +151,15 @@ public class ResourceServiceImpl implements ResourceService {
     }
 
     @Override
-    public Map<String, Object> createEnum(Map<String, Object> body) {
-        validateEnum(body);
-        String id = id("enum", body.get("enumType") + "-" + body.get("value"));
-        resourceMapper.insertEnum(id, body);
+    public Map<String, Object> createEnum(EnumItemRequest request) {
+        String id = id("enum", request.enumType() + "-" + request.normalizedValue());
+        resourceMapper.insertEnum(id, request);
         return resourceMapper.enumItem(id);
     }
 
     @Override
-    public Map<String, Object> updateEnum(String id, Map<String, Object> body) {
-        validateEnum(body);
-        resourceMapper.updateEnum(id, body);
+    public Map<String, Object> updateEnum(String id, EnumItemRequest request) {
+        resourceMapper.updateEnum(id, request);
         return resourceMapper.enumItem(id);
     }
 
@@ -175,20 +170,16 @@ public class ResourceServiceImpl implements ResourceService {
     }
 
     @Override
-    public Map<String, Object> createTaskStatusTransition(Map<String, Object> body) {
-        ValidationUtil.requireText(body, "fromStatus", "起始状态", 64);
-        ValidationUtil.requireText(body, "toStatus", "目标状态", 64);
-        Object fromStatus = body.get("fromStatus");
-        Object toStatus = body.get("toStatus");
-        if (fromStatus == null || toStatus == null || String.valueOf(fromStatus).isBlank() || String.valueOf(toStatus).isBlank()) {
-            throw new IllegalArgumentException("fromStatus and toStatus are required");
+    public Map<String, Object> createTaskStatusTransition(TaskStatusTransitionRequest request) {
+        if (request.fromStatus().equals(request.toStatus())) {
+            throw new IllegalArgumentException("起始状态和目标状态不能相同");
         }
-        List<String> existingIds = resourceMapper.taskStatusTransitionIdsByPair(fromStatus, toStatus);
+        List<String> existingIds = resourceMapper.taskStatusTransitionIdsByPair(request.fromStatus(), request.toStatus());
         if (!existingIds.isEmpty()) {
             return resourceMapper.taskStatusTransition(existingIds.getFirst());
         }
-        String id = id("tr-task", fromStatus + "-" + toStatus);
-        resourceMapper.insertTaskStatusTransition(id, fromStatus, toStatus);
+        String id = id("tr-task", request.fromStatus() + "-" + request.toStatus());
+        resourceMapper.insertTaskStatusTransition(id, request.fromStatus(), request.toStatus());
         return resourceMapper.taskStatusTransition(id);
     }
 
@@ -205,71 +196,29 @@ public class ResourceServiceImpl implements ResourceService {
         user.put("directPermissions", resourceMapper.userDirectPermissions(id));
     }
 
-    private void normalizeUserEmail(Map<String, Object> body) {
-        Object rawEmail = body.get("email");
-        String email = rawEmail == null ? "" : String.valueOf(rawEmail).trim();
-        if (!email.isBlank()) {
-            body.put("email", email);
-            return;
-        }
-        Object account = body.get("account");
-        String accountValue = account == null ? "" : String.valueOf(account).trim();
-        body.put("email", accountValue.contains("@") ? accountValue : null);
-    }
-
-    private void validateUser(Map<String, Object> body) {
-        ValidationUtil.requireText(body, "name", "姓名", 40);
-        ValidationUtil.requireAccount(body, "account", "账号");
-        ValidationUtil.optionalEmail(body, "email", "邮箱");
-        ValidationUtil.maxList(body, "departments", "所属部门", 20);
-        ValidationUtil.maxList(body, "globalRoles", "角色", 20);
-        ValidationUtil.maxList(body, "directPermissions", "直接权限", 200);
-        ValidationUtil.optionalText(body, "status", "状态", 20);
-    }
-
-    private void validateDepartment(Map<String, Object> body) {
-        ValidationUtil.requireText(body, "name", "部门名称", 40);
-        ValidationUtil.optionalText(body, "status", "部门状态", 20);
-    }
-
-    private void validateRole(Map<String, Object> body) {
-        ValidationUtil.requireText(body, "name", "角色名称", 40);
-        ValidationUtil.optionalText(body, "roleType", "角色类型", 40);
-        ValidationUtil.optionalText(body, "status", "角色状态", 20);
-        ValidationUtil.maxList(body, "permissions", "角色权限", 300);
-    }
-
-    private void validateEnum(Map<String, Object> body) {
-        ValidationUtil.requireText(body, "enumType", "枚举类型", 64);
-        ValidationUtil.requireText(body, "name", "枚举名称", 80);
-        ValidationUtil.requireText(body, "value", "枚举值", 80);
-        ValidationUtil.optionalText(body, "semantic", "枚举语义", 40);
-    }
-
     private Map<String, Object> getUser(String id) {
         Map<String, Object> user = resourceMapper.user(id);
         enrichUser(user);
         return user;
     }
 
-    @SuppressWarnings("unchecked")
-    private void replaceUserRelations(String userId, Map<String, Object> body) {
+    private void replaceUserRelations(String userId, UserRequest request) {
         resourceMapper.deleteUserDepartments(userId);
-        for (Object name : (List<Object>) body.getOrDefault("departments", List.of())) {
+        for (String name : request.safeDepartments()) {
             List<String> ids = resourceMapper.departmentIdsByName(name);
             if (!ids.isEmpty()) {
                 resourceMapper.insertUserDepartment(userId, ids.getFirst());
             }
         }
         resourceMapper.deleteUserRoles(userId);
-        for (Object name : (List<Object>) body.getOrDefault("globalRoles", List.of("普通员工"))) {
+        for (String name : request.safeGlobalRoles()) {
             List<String> ids = resourceMapper.roleIdsByName(name);
             if (!ids.isEmpty()) {
                 resourceMapper.insertUserRole(userId, ids.getFirst());
             }
         }
         resourceMapper.deleteUserPermissions(userId);
-        for (Object code : (List<Object>) body.getOrDefault("directPermissions", List.of())) {
+        for (String code : request.safeDirectPermissions()) {
             List<String> ids = resourceMapper.permissionIdsByCode(code);
             if (!ids.isEmpty()) {
                 resourceMapper.insertUserPermission(userId, ids.getFirst());
@@ -277,10 +226,9 @@ public class ResourceServiceImpl implements ResourceService {
         }
     }
 
-    @SuppressWarnings("unchecked")
-    private void replaceRolePermissions(String roleId, Map<String, Object> body) {
+    private void replaceRolePermissions(String roleId, RoleRequest request) {
         resourceMapper.deleteRolePermissions(roleId);
-        for (Object code : (List<Object>) body.getOrDefault("permissions", List.of())) {
+        for (String code : request.safePermissions()) {
             List<String> ids = resourceMapper.permissionIdsByCode(code);
             if (!ids.isEmpty()) {
                 resourceMapper.insertRolePermission(roleId, ids.getFirst());

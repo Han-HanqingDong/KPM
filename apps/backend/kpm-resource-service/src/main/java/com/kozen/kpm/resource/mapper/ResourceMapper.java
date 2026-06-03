@@ -1,6 +1,10 @@
 package com.kozen.kpm.resource.mapper;
 
 import com.kozen.kpm.common.mapper.JdbcMapMapper;
+import com.kozen.kpm.resource.dto.DepartmentRequest;
+import com.kozen.kpm.resource.dto.EnumItemRequest;
+import com.kozen.kpm.resource.dto.RoleRequest;
+import com.kozen.kpm.resource.dto.UserRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -36,16 +40,18 @@ public class ResourceMapper extends JdbcMapMapper {
         return column("select p.code from kpm_permissions p join kpm_user_permissions up on up.permission_id=p.id where up.user_id=? order by p.code", String.class, userId);
     }
 
-    public void insertUser(String id, Map<String, Object> body) {
-        update("insert into kpm_users (id, account, email, name, password_hash, status) values (?, ?, ?, ?, '{noop}123456', ?)", id, body.get("account"), body.get("email"), body.get("name"), body.getOrDefault("status", "启用"));
+    public void insertUser(String id, UserRequest request) {
+        update("insert into kpm_users (id, account, email, name, password_hash, status) values (?, ?, ?, ?, '{noop}123456', ?)",
+                id, request.loginAccount(), request.normalizedEmail(), request.name(), request.normalizedStatus());
     }
 
     public void resetUserPassword(String id, String passwordHash) {
         update("update kpm_users set password_hash=? where id=?", passwordHash, id);
     }
 
-    public void updateUser(String id, Map<String, Object> body) {
-        update("update kpm_users set account=?, email=?, name=?, status=?, updated_at=current_timestamp where id=?", body.get("account"), body.get("email"), body.get("name"), body.getOrDefault("status", "启用"), id);
+    public void updateUser(String id, UserRequest request) {
+        update("update kpm_users set account=?, email=?, name=?, status=?, updated_at=current_timestamp, update_time=current_timestamp where id=?",
+                request.loginAccount(), request.normalizedEmail(), request.name(), request.normalizedStatus(), id);
     }
 
     public void deleteUser(String id) {
@@ -98,12 +104,12 @@ public class ResourceMapper extends JdbcMapMapper {
         return row("select * from kpm_departments where id=?", id);
     }
 
-    public void insertDepartment(String id, Map<String, Object> body) {
-        update("insert into kpm_departments (id, name, status) values (?, ?, ?)", id, body.get("name"), body.getOrDefault("status", "启用"));
+    public void insertDepartment(String id, DepartmentRequest request) {
+        update("insert into kpm_departments (id, name, status) values (?, ?, ?)", id, request.name(), request.normalizedStatus());
     }
 
-    public void updateDepartment(String id, Map<String, Object> body) {
-        update("update kpm_departments set name=?, status=? where id=?", body.get("name"), body.getOrDefault("status", "启用"), id);
+    public void updateDepartment(String id, DepartmentRequest request) {
+        update("update kpm_departments set name=?, status=?, update_time=current_timestamp where id=?", request.name(), request.normalizedStatus(), id);
     }
 
     public void deleteDepartment(String id) {
@@ -125,12 +131,12 @@ public class ResourceMapper extends JdbcMapMapper {
                 """, String.class, roleId);
     }
 
-    public void insertRole(String id, Map<String, Object> body) {
-        update("insert into kpm_roles (id, name, role_type, status) values (?, ?, ?, ?)", id, body.get("name"), body.getOrDefault("roleType", "项目内角色"), body.getOrDefault("status", "启用"));
+    public void insertRole(String id, RoleRequest request) {
+        update("insert into kpm_roles (id, name, role_type, status) values (?, ?, ?, ?)", id, request.name(), request.normalizedRoleType(), request.normalizedStatus());
     }
 
-    public void updateRole(String id, Map<String, Object> body) {
-        update("update kpm_roles set name=?, role_type=?, status=? where id=?", body.get("name"), body.getOrDefault("roleType", "项目内角色"), body.getOrDefault("status", "启用"), id);
+    public void updateRole(String id, RoleRequest request) {
+        update("update kpm_roles set name=?, role_type=?, status=?, update_time=current_timestamp where id=?", request.name(), request.normalizedRoleType(), request.normalizedStatus(), id);
     }
 
     public void deleteRole(String id) {
@@ -181,14 +187,14 @@ public class ResourceMapper extends JdbcMapMapper {
         return row("select * from kpm_enum_items where id=?", id);
     }
 
-    public void insertEnum(String id, Map<String, Object> body) {
+    public void insertEnum(String id, EnumItemRequest request) {
         update("insert into kpm_enum_items (id, enum_type, name, value, semantic, active, sort_order) values (?, ?, ?, ?, ?, ?, ?)",
-                id, body.get("enumType"), body.get("name"), body.getOrDefault("value", body.get("name")), body.get("semantic"), body.getOrDefault("active", true), body.getOrDefault("sortOrder", 100));
+                id, request.enumType(), request.name(), request.normalizedValue(), request.semantic(), request.normalizedActive(), request.normalizedSortOrder());
     }
 
-    public void updateEnum(String id, Map<String, Object> body) {
-        update("update kpm_enum_items set name=?, value=?, semantic=?, active=?, sort_order=? where id=?",
-                body.get("name"), body.getOrDefault("value", body.get("name")), body.get("semantic"), body.getOrDefault("active", true), body.getOrDefault("sortOrder", 100), id);
+    public void updateEnum(String id, EnumItemRequest request) {
+        update("update kpm_enum_items set name=?, value=?, semantic=?, active=?, sort_order=?, update_time=current_timestamp where id=?",
+                request.name(), request.normalizedValue(), request.semantic(), request.normalizedActive(), request.normalizedSortOrder(), id);
     }
 
     public void deleteEnum(String id) {

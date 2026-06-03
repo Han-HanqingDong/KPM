@@ -1,12 +1,25 @@
 package com.kozen.kpm.notification.service;
 
+import com.kozen.kpm.notification.dto.InternalMessageDto;
+
 import java.util.List;
 import java.util.Map;
 
 public interface NotificationService {
     void processPendingEvents();
-    List<Map<String, Object>> messages(String account, boolean unreadOnly);
+    /**
+     * Query internal messages for the current account.
+     *
+     * @param account current login account from token/header context
+     * @param unreadOnly true to return unread messages only
+     * @return internal messages with explicit read status for frontend rendering
+     */
+    List<InternalMessageDto> messages(String account, boolean unreadOnly);
     int unreadCount(String account);
+    /** Mark one internal message as read for the current account. */
     boolean markRead(String account, String messageId);
+
+    /** Mark all unread internal messages as read for the current account. */
+    int markAllRead(String account);
     Map<String, Object> settings();
 }

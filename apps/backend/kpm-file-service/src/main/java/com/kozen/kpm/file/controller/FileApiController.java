@@ -43,8 +43,11 @@ public class FileApiController {
 
     @GetMapping("/download-url")
     @Operation(summary = "生成文件下载链接", description = "根据 OSS objectKey 生成短期有效的签名下载链接。")
-    public ApiResponse<DownloadUrlResult> downloadUrl(@RequestParam @NotBlank String objectKey) {
-        return ApiResponse.ok(fileStorageService.createDownloadUrl(objectKey));
+    public ApiResponse<DownloadUrlResult> downloadUrl(
+            @RequestParam @NotBlank String objectKey,
+            @RequestParam(required = false) String fileName
+    ) {
+        return ApiResponse.ok(fileStorageService.createDownloadUrl(objectKey, fileName));
     }
 
     @GetMapping("/oss/status")

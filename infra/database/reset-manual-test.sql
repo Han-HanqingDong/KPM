@@ -46,14 +46,14 @@ VALUES ('dept-admin', '系统管理部', '启用');
 INSERT INTO kpm_roles (id, name, role_type, status)
 VALUES ('role-admin', '系统管理员', '全局角色', '启用');
 
-INSERT INTO kpm_users (id, account, name, password_hash, status)
-VALUES ('user-zhangmin', 'zhangmin', '张敏', '{noop}123456', '启用');
+INSERT INTO kpm_users (id, account, email, name, password_hash, status)
+VALUES ('user-admin', 'admin@kozenmobile.com', 'admin@kozenmobile.com', '系统管理员', '{noop}123456', '启用');
 
 INSERT INTO kpm_user_departments (user_id, department_id)
-VALUES ('user-zhangmin', 'dept-admin');
+VALUES ('user-admin', 'dept-admin');
 
 INSERT INTO kpm_user_roles (user_id, role_id)
-VALUES ('user-zhangmin', 'role-admin');
+VALUES ('user-admin', 'role-admin');
 
 INSERT INTO kpm_role_permissions (role_id, permission_id)
 SELECT 'role-admin', id FROM kpm_permissions;

@@ -1,8 +1,17 @@
 package com.kozen.kpm.project.service.impl;
 
+import com.kozen.kpm.common.dto.FileMetadataRequest;
 import com.kozen.kpm.common.util.IdUtil;
 import com.kozen.kpm.common.util.JsonUtil;
-import com.kozen.kpm.common.util.ValidationUtil;
+import com.kozen.kpm.project.dto.ArchiveProjectRequest;
+import com.kozen.kpm.project.dto.LinkCustomerRequest;
+import com.kozen.kpm.project.dto.ProcessTemplateRequest;
+import com.kozen.kpm.project.dto.ProjectCustomerStatusRequest;
+import com.kozen.kpm.project.dto.ProjectMembersRequest;
+import com.kozen.kpm.project.dto.ProjectRequest;
+import com.kozen.kpm.project.dto.RequirementRequest;
+import com.kozen.kpm.project.dto.StageRecordRequest;
+import com.kozen.kpm.project.dto.StageStatusRequest;
 import com.kozen.kpm.project.mapper.ProjectMapper;
 import com.kozen.kpm.project.service.ProjectService;
 import org.springframework.stereotype.Service;
@@ -41,12 +50,12 @@ public class ProjectServiceImpl implements ProjectService {
 
     @Override
     @Transactional
-    public Map<String, Object> create(Map<String, Object> body) {
-        validateProject(body);
-        String id = uniqueProjectId(String.valueOf(body.getOrDefault("externalName", "project")));
-        String salesability = String.valueOf(body.getOrDefault("salesability", "不可销售"));
-        Object unsellableReason = "可销售".equals(salesability) ? null : body.get("unsellableReason");
-        Map<String, Object> manager = requireUser(body.get("managerAccount"), "项目负责人");
+    public Map<String, Object> create(ProjectRequest request) {
+        Map<String, Object> body = request.toMap();
+        String id = uniqueProjectId(request.externalName());
+        String salesability = request.safeSalesability();
+        Object unsellableReason = request.safeUnsellableReason();
+        Map<String, Object> manager = requireUser(request.managerAccount(), "项目负责人");
         projectMapper.insertProject(id, body, salesability, unsellableReason, String.valueOf(manager.get("id")), String.valueOf(manager.get("account")));
         replaceProjectMembers(id, body);
         createProjectStages(id, body);
@@ -57,18 +66,14 @@ public class ProjectServiceImpl implements ProjectService {
 
     @Override
     @Transactional
-    public Map<String, Object> update(String id, Map<String, Object> body) {
-        validateProject(body);
-        String salesability = String.valueOf(body.getOrDefault("salesability", "不可销售"));
-        Object unsellableReason = "可销售".equals(salesability) ? null : body.get("unsellableReason");
-        Map<String, Object> manager = requireUser(body.get("managerAccount"), "项目负责人");
+    public Map<String, Object> update(String id, ProjectRequest request) {
+        Map<String, Object> body = request.toMap();
+        String salesability = request.safeSalesability();
+        Object unsellableReason = request.safeUnsellableReason();
+        Map<String, Object> manager = requireUser(request.managerAccount(), "项目负责人");
         projectMapper.updateProject(id, body, salesability, unsellableReason, String.valueOf(manager.get("id")), String.valueOf(manager.get("account")));
-        if (body.containsKey("members")) {
-            replaceProjectMembers(id, body);
-        }
-        if (body.containsKey("stages")) {
-            replaceStageAssignees(id, body);
-        }
+        replaceProjectMembers(id, body);
+        replaceStageAssignees(id, body);
         syncProjectStatus(id);
         return detail(id);
     }
@@ -81,9 +86,8 @@ public class ProjectServiceImpl implements ProjectService {
 
     @Override
     @Transactional
-    public Map<String, Object> updateStage(String stageId, Map<String, Object> body) {
-        ValidationUtil.requireText(body, "status", "阶段状态", 40);
-        projectMapper.updateStageStatus(stageId, body.getOrDefault("status", "未开始"));
+    public Map<String, Object> updateStage(String stageId, StageStatusRequest request) {
+        projectMapper.updateStageStatus(stageId, request.status());
         Map<String, Object> stage = projectMapper.stage(stageId);
         syncProjectStatus(String.valueOf(stage.get("projectId")));
         return stage;
@@ -91,19 +95,16 @@ public class ProjectServiceImpl implements ProjectService {
 
     @Override
     @Transactional
-    public Map<String, Object> replaceMembers(String id, Map<String, Object> body) {
-        ValidationUtil.maxList(body, "members", "项目成员", 200);
-        replaceProjectMembers(id, body);
+    public Map<String, Object> replaceMembers(String id, ProjectMembersRequest request) {
+        replaceProjectMembers(id, request.toMap());
         return detail(id);
     }
 
     @Override
     @Transactional
-    public Map<String, Object> linkCustomer(String projectId, Map<String, Object> body) {
-        ValidationUtil.requireText(body, "customerId", "客户ID", 80);
-        ValidationUtil.optionalText(body, "projectStatus", "客户项目状态", 60);
-        String customerId = String.valueOf(body.get("customerId"));
-        String projectStatus = String.valueOf(body.getOrDefault("projectStatus", "商机发掘"));
+    public Map<String, Object> linkCustomer(String projectId, LinkCustomerRequest request) {
+        String customerId = request.customerId();
+        String projectStatus = request.safeProjectStatus();
         List<String> existing = projectMapper.projectCustomerIds(projectId, customerId);
         if (existing.isEmpty()) {
             projectMapper.insertProjectCustomer(IdUtil.nanoId("pc"), projectId, customerId, projectStatus);
@@ -115,28 +116,29 @@ public class ProjectServiceImpl implements ProjectService {
 
     @Override
     @Transactional
-    public Map<String, Object> updateProjectCustomerStatus(String projectId, String customerId, Map<String, Object> body) {
-        ValidationUtil.requireText(body, "projectStatus", "客户项目状态", 60);
-        projectMapper.updateProjectCustomerStatus(projectId, customerId, body.getOrDefault("projectStatus", "商机发掘"));
+    public Map<String, Object> updateProjectCustomerStatus(String projectId, String customerId, ProjectCustomerStatusRequest request) {
+        projectMapper.updateProjectCustomerStatus(projectId, customerId, request.projectStatus());
         return detail(projectId);
     }
 
     @Override
     @Transactional
-    public Map<String, Object> addStageRecord(String stageId, Map<String, Object> body) {
-        ValidationUtil.requireText(body, "content", "阶段留言内容", 2000);
-        ValidationUtil.optionalText(body, "author", "留言人", 60);
-        ValidationUtil.optionalJsonArrayLike(body, "attachments", "阶段留言附件", 20);
-        projectMapper.insertStageRecord(IdUtil.nanoId("sr"), stageId, body.getOrDefault("author", "张敏"), body.get("content"), body.get("attachments"));
+    public Map<String, Object> addStageRecord(String stageId, StageRecordRequest request) {
+        boolean hasText = request.content() != null && !request.content().isBlank();
+        boolean hasFiles = request.attachments() != null && !request.attachments().isEmpty();
+        if (!hasText && !hasFiles) {
+            throw new IllegalArgumentException("阶段留言内容或附件不能为空");
+        }
+        String author = request.author() == null || request.author().isBlank() ? "张敏" : request.author();
+        projectMapper.insertStageRecord(IdUtil.nanoId("sr"), stageId, author, request.content(), request.safeAttachments());
         Map<String, Object> stage = projectMapper.stage(stageId);
         return detail(String.valueOf(stage.get("projectId")));
     }
 
     @Override
     @Transactional
-    public Map<String, Object> addStageMaterial(String stageId, Map<String, Object> body) {
-        ValidationUtil.validateFileMeta(body);
-        projectMapper.insertStageMaterial(IdUtil.nanoId("sm"), stageId, body);
+    public Map<String, Object> addStageMaterial(String stageId, FileMetadataRequest request) {
+        projectMapper.insertStageMaterial(IdUtil.nanoId("sm"), stageId, request.toMap());
         Map<String, Object> stage = projectMapper.stage(stageId);
         return detail(String.valueOf(stage.get("projectId")));
     }
@@ -152,9 +154,8 @@ public class ProjectServiceImpl implements ProjectService {
 
     @Override
     @Transactional
-    public Map<String, Object> archive(String id, Map<String, Object> body) {
-        if (!body.containsKey("archived")) throw new IllegalArgumentException("归档状态不能为空");
-        projectMapper.archiveProject(id, body.getOrDefault("archived", true));
+    public Map<String, Object> archive(String id, ArchiveProjectRequest request) {
+        projectMapper.archiveProject(id, request.archived());
         return detail(id);
     }
 
@@ -165,8 +166,8 @@ public class ProjectServiceImpl implements ProjectService {
 
     @Override
     @Transactional
-    public Map<String, Object> createRequirement(String projectId, String customerId, Map<String, Object> body) {
-        validateRequirement(body);
+    public Map<String, Object> createRequirement(String projectId, String customerId, RequirementRequest request) {
+        Map<String, Object> body = request.toMap();
         String requirementId = nextRequirementId();
         String taskId = null;
         if (Boolean.TRUE.equals(body.getOrDefault("createTask", true))) {
@@ -201,9 +202,9 @@ public class ProjectServiceImpl implements ProjectService {
 
     @Override
     @Transactional
-    public Map<String, Object> createTemplate(Map<String, Object> body) {
-        validateTemplate(body);
-        String id = uniqueTemplateId(String.valueOf(body.getOrDefault("name", "template")));
+    public Map<String, Object> createTemplate(ProcessTemplateRequest request) {
+        Map<String, Object> body = request.toMap();
+        String id = uniqueTemplateId(request.name());
         projectMapper.insertTemplate(id, body);
         replaceTemplateStages(id, body);
         Map<String, Object> template = projectMapper.template(id);
@@ -213,8 +214,8 @@ public class ProjectServiceImpl implements ProjectService {
 
     @Override
     @Transactional
-    public Map<String, Object> updateTemplate(String id, Map<String, Object> body) {
-        validateTemplate(body);
+    public Map<String, Object> updateTemplate(String id, ProcessTemplateRequest request) {
+        Map<String, Object> body = request.toMap();
         projectMapper.updateTemplate(id, body);
         replaceTemplateStages(id, body);
         Map<String, Object> template = projectMapper.template(id);
@@ -249,39 +250,6 @@ public class ProjectServiceImpl implements ProjectService {
 
     private void enrichTemplate(Map<String, Object> template) {
         template.put("stages", projectMapper.templateStageNames(String.valueOf(template.get("id"))));
-    }
-
-    private void validateProject(Map<String, Object> body) {
-        ValidationUtil.requireText(body, "externalName", "项目对外名称", 120);
-        ValidationUtil.requireText(body, "internalName", "项目内部名称", 120);
-        ValidationUtil.requireText(body, "modelName", "Model 名称", 120);
-        ValidationUtil.requireAccount(body, "managerAccount", "项目负责人账号");
-        ValidationUtil.optionalText(body, "status", "项目状态", 40);
-        ValidationUtil.optionalText(body, "salesability", "可销售状态", 40);
-        if (!"可销售".equals(String.valueOf(body.getOrDefault("salesability", "")))) {
-            ValidationUtil.optionalText(body, "unsellableReason", "不可销售原因", 120);
-        }
-        ValidationUtil.optionalText(body, "description", "项目描述", 2000);
-        ValidationUtil.maxList(body, "members", "项目成员", 200);
-        ValidationUtil.maxList(body, "stages", "项目阶段", 80);
-    }
-
-    private void validateRequirement(Map<String, Object> body) {
-        ValidationUtil.requireText(body, "title", "需求标题", 120);
-        ValidationUtil.requireText(body, "userStory", "用户故事", 1500);
-        ValidationUtil.requireText(body, "businessValue", "业务价值", 1000);
-        ValidationUtil.requireText(body, "acceptance", "验收标准", 1500);
-        ValidationUtil.requireText(body, "priority", "优先级", 20);
-        ValidationUtil.optionalText(body, "status", "需求状态", 40);
-        ValidationUtil.optionalText(body, "proposer", "提出人", 60);
-        ValidationUtil.optionalText(body, "creator", "创建人", 60);
-    }
-
-    private void validateTemplate(Map<String, Object> body) {
-        ValidationUtil.requireText(body, "name", "模板名称", 80);
-        ValidationUtil.requireText(body, "scope", "适用范围", 120);
-        ValidationUtil.optionalText(body, "status", "模板状态", 20);
-        ValidationUtil.maxList(body, "stages", "模板阶段", 80);
     }
 
     @SuppressWarnings("unchecked")

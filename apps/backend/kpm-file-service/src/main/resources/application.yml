@@ -39,11 +39,3 @@ management:
 kpm:
   service:
     code: file
-  oss:
-    enabled: ${KPM_OSS_ENABLED:false}
-    endpoint: ${KPM_OSS_ENDPOINT:https://oss-cn-shanghai.aliyuncs.com}
-    bucket: ${KPM_OSS_BUCKET:xc-kozen-sh-fw}
-    root-prefix: ${KPM_OSS_ROOT_PREFIX:KPM/}
-    access-key-id: ${KPM_OSS_ACCESS_KEY_ID:}
-    access-key-secret: ${KPM_OSS_ACCESS_KEY_SECRET:}
-    download-url-expiration-seconds: ${KPM_OSS_DOWNLOAD_URL_EXPIRE_SECONDS:900}

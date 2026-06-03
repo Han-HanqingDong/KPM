@@ -3,6 +3,8 @@ package com.kozen.kpm.notification.service.impl;
 import com.kozen.kpm.common.util.IdUtil;
 import com.kozen.kpm.common.util.JsonUtil;
 import com.kozen.kpm.notification.config.NotificationProperties;
+import com.kozen.kpm.notification.converter.NotificationConverter;
+import com.kozen.kpm.notification.dto.InternalMessageDto;
 import com.kozen.kpm.notification.mapper.NotificationMapper;
 import com.kozen.kpm.notification.service.NotificationService;
 import org.springframework.beans.factory.ObjectProvider;
@@ -20,11 +22,13 @@ import java.util.Map;
 public class NotificationServiceImpl implements NotificationService {
     private final NotificationMapper notificationMapper;
     private final NotificationProperties properties;
+    private final NotificationConverter notificationConverter;
     private final JavaMailSender mailSender;
 
-    public NotificationServiceImpl(NotificationMapper notificationMapper, NotificationProperties properties, ObjectProvider<JavaMailSender> mailSenderProvider) {
+    public NotificationServiceImpl(NotificationMapper notificationMapper, NotificationProperties properties, NotificationConverter notificationConverter, ObjectProvider<JavaMailSender> mailSenderProvider) {
         this.notificationMapper = notificationMapper;
         this.properties = properties;
+        this.notificationConverter = notificationConverter;
         this.mailSender = mailSenderProvider.getIfAvailable();
     }
 
@@ -48,8 +52,10 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
-    public List<Map<String, Object>> messages(String account, boolean unreadOnly) {
-        return notificationMapper.messages(currentUserId(account), unreadOnly);
+    public List<InternalMessageDto> messages(String account, boolean unreadOnly) {
+        return notificationMapper.messages(currentUserId(account), unreadOnly).stream()
+                .map(notificationConverter::toInternalMessageDto)
+                .toList();
     }
 
     @Override
@@ -60,8 +66,12 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     public boolean markRead(String account, String messageId) {
-        notificationMapper.markRead(messageId, currentUserId(account));
-        return true;
+        return notificationMapper.markRead(messageId, currentUserId(account)) > 0;
+    }
+
+    @Override
+    public int markAllRead(String account) {
+        return notificationMapper.markAllRead(currentUserId(account));
     }
 
     @Override

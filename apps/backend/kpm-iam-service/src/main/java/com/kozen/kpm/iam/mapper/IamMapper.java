@@ -13,11 +13,11 @@ public class IamMapper extends JdbcMapMapper {
     public IamMapper(JdbcTemplate jdbc) { super(jdbc); }
 
     public List<Map<String, Object>> findUserForLogin(String account) {
-        return rows("select id, account, email, name, password_hash, status from kpm_users where account = ?", account);
+        return rows("select id, account, email, name, password_hash, status from kpm_users where account = ? or email = ?", account, account);
     }
 
     public List<Map<String, Object>> findUser(String account) {
-        return rows("select id, account, email, name, status from kpm_users where account = ?", account);
+        return rows("select id, account, email, name, status from kpm_users where account = ? or email = ?", account, account);
     }
 
     public void updatePassword(String userId, String passwordHash) {

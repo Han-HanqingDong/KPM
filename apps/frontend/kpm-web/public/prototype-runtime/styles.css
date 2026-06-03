@@ -2236,8 +2236,8 @@ button:disabled {
 
 .login-language-toggle {
   position: absolute;
-  top: 18px;
-  right: 18px;
+  top: -52px;
+  right: 0;
   border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.72);
@@ -2249,4 +2249,202 @@ button:disabled {
 }
 .login-language-toggle:hover {
   background: rgba(255, 255, 255, 0.92);
+}
+
+.context-filter-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0 16px;
+  padding: 12px 14px;
+  border: 1px solid rgba(36, 87, 245, 0.18);
+  border-radius: 14px;
+  background: var(--primary-soft);
+  color: #1e3a8a;
+}
+
+.context-filter-banner span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metric-link {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.notification-list {
+  max-height: none;
+  overflow: visible;
+}
+
+.notification-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.notification-filters {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+
+.notification-filter-btn {
+  border: 0;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.notification-filter-btn.active {
+  background: #fff;
+  color: var(--primary);
+  box-shadow: 0 6px 18px rgba(36, 87, 245, 0.12);
+}
+
+.notification-list-scroll {
+  display: grid;
+  gap: 10px;
+  max-height: 320px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.notification-item {
+  position: relative;
+}
+
+.notification-item.unread {
+  border-color: rgba(36, 87, 245, 0.28);
+  background: #f7faff;
+}
+
+.notification-item.read {
+  opacity: 0.78;
+}
+
+.notification-item-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.notification-status {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.notification-status.unread {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.notification-status.read {
+  background: #ecfdf3;
+  color: var(--success);
+}
+
+.notification-item-action {
+  margin-top: 8px;
+}
+
+.dashboard-task-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(36, 87, 245, 0.08);
+}
+
+.dashboard-task-card::after {
+  content: "";
+  position: absolute;
+  width: 110px;
+  height: 110px;
+  right: -34px;
+  top: -42px;
+  border-radius: 999px;
+  opacity: 0.28;
+}
+
+.dashboard-task-card small {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.dashboard-task-card.task-total::after {
+  background: #60a5fa;
+}
+
+.dashboard-task-card.task-ongoing::after {
+  background: #12b76a;
+}
+
+.dashboard-task-card.task-waiting::after {
+  background: #f79009;
+}
+
+.project-bubble-list {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+}
+
+.project-bubble-card {
+  min-height: 92px;
+  border: 0;
+  border-radius: 22px;
+  padding: 18px;
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.14);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.project-bubble-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 22px 42px rgba(15, 23, 42, 0.18);
+}
+
+.project-bubble-card span {
+  display: block;
+  font-size: 18px;
+  font-weight: 850;
+  letter-spacing: 0.01em;
+}
+
+.project-bubble-card.tone-1 { background: linear-gradient(135deg, #2457f5, #60a5fa); }
+.project-bubble-card.tone-2 { background: linear-gradient(135deg, #0f766e, #2dd4bf); }
+.project-bubble-card.tone-3 { background: linear-gradient(135deg, #7c3aed, #c084fc); }
+.project-bubble-card.tone-4 { background: linear-gradient(135deg, #ea580c, #fbbf24); }
+.project-bubble-card.tone-5 { background: linear-gradient(135deg, #be123c, #fb7185); }
+.project-bubble-card.tone-6 { background: linear-gradient(135deg, #334155, #64748b); }
+
+button.dashboard-task-card {
+  display: block;
+  width: 100%;
+  border: 0;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+button.dashboard-task-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 46px rgba(24, 34, 48, 0.12);
 }

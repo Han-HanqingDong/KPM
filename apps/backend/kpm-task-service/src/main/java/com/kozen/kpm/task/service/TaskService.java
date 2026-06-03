@@ -1,5 +1,9 @@
 package com.kozen.kpm.task.service;
 
+import com.kozen.kpm.common.dto.FileMetadataRequest;
+import com.kozen.kpm.task.dto.TaskCommentRequest;
+import com.kozen.kpm.task.dto.TaskRequest;
+
 import java.util.List;
 import java.util.Map;
 
@@ -14,13 +18,13 @@ public interface TaskService {
     /** Load one task detail. */
     Map<String, Object> detail(String id);
     /** Create one task. */
-    Map<String, Object> create(Map<String, Object> body);
+    Map<String, Object> create(TaskRequest request);
     /** Update one task and sync linked requirement status if needed. */
-    Map<String, Object> update(String id, Map<String, Object> body);
+    Map<String, Object> update(String id, TaskRequest request);
     /** Delete one task. */
     boolean delete(String id);
     /** Add one task comment. */
-    Map<String, Object> addComment(String id, Map<String, Object> body);
+    Map<String, Object> addComment(String id, TaskCommentRequest request);
     /** Add one task attachment record. */
-    Map<String, Object> addAttachment(String id, Map<String, Object> body);
+    Map<String, Object> addAttachment(String id, FileMetadataRequest request);
 }

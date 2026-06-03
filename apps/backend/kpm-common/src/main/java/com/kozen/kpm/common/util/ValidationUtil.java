@@ -50,6 +50,17 @@ public final class ValidationUtil {
         return account;
     }
 
+
+    public static String requireEmail(Map<String, Object> body, String key, String label) {
+        return requireEmail(value(body, key), label);
+    }
+
+    public static String requireEmail(Object value, String label) {
+        String email = requireText(value, label, 128);
+        if (!EMAIL.matcher(email).matches()) throw invalid(label + "格式不正确");
+        return email;
+    }
+
     public static String optionalEmail(Map<String, Object> body, String key, String label) {
         String email = optionalText(body, key, label, 128);
         if (!email.isBlank() && !EMAIL.matcher(email).matches()) throw invalid(label + "格式不正确");

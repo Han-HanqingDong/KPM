@@ -143,7 +143,7 @@ const templates = [
 
 const resourceData = {
   users: [
-    { name: '张敏', account: 'zhangmin', departments: ['产品部', '运营部'], globalRoles: ['系统管理员'], directPermissions: ['button:customer-statuses:toggle'], status: '启用' },
+    { name: '张敏', account: 'admin@kozenmobile.com', departments: ['产品部', '运营部'], globalRoles: ['系统管理员'], directPermissions: ['button:customer-statuses:toggle'], status: '启用' },
     { name: '王伟', account: 'wangwei', departments: ['硬件部', '产品部'], globalRoles: ['普通员工'], directPermissions: [], status: '启用' },
     { name: '李娜', account: 'lina', departments: ['软件部'], globalRoles: ['普通员工'], directPermissions: [], status: '启用' },
     { name: '陈晨', account: 'chenchen', departments: ['技术支持部'], globalRoles: ['普通员工'], directPermissions: ['button:customers:create', 'button:customers:edit'], status: '启用' },
@@ -589,7 +589,7 @@ const tasks = [
 ];
 
 let currentUser = localStorage.getItem('kpm.currentUserName') || '张敏';
-let currentAccount = localStorage.getItem('kpm.currentAccount') || 'zhangmin';
+let currentAccount = localStorage.getItem('kpm.currentAccount') || 'admin@kozenmobile.com';
 let currentSession = { token: localStorage.getItem('kpm.authToken') || '' };
 let currentUserPermissions = JSON.parse(localStorage.getItem('kpm.currentPermissions') || '[]');
 let currentUserRoles = JSON.parse(localStorage.getItem('kpm.currentRoles') || '[]');
@@ -622,8 +622,10 @@ const navItems = document.querySelectorAll('.nav-item');
 const pageTitle = document.getElementById('page-title');
 const pageSubtitle = document.getElementById('page-subtitle');
 const projectTable = document.getElementById('project-table');
+const dashboardSummary = document.getElementById('dashboard-summary');
 const myProjects = document.getElementById('my-projects');
 const projectDetail = document.getElementById('project-detail');
+const projectDetailBack = document.getElementById('project-detail-back');
 const projectEdit = document.getElementById('project-edit');
 const stageDetail = document.getElementById('stage-detail');
 const customerPlaceholder = document.getElementById('customer-placeholder');
@@ -726,13 +728,26 @@ let selectedActivityCell = null;
 let selectedSupportCustomer = 'Nova Retail';
 let supportCustomerKeyword = 'Nova Retail';
 let notificationRefreshTimer = null;
-let supportTaskModalId = null;
+let notificationFilter = 'unread';
+let taskListFilters = {
+  keyword: '',
+  project: '全部项目',
+  status: '全部状态',
+  priority: '全部优先级',
+  assignee: '全部执行者',
+  category: '全部分类',
+  taskIds: null,
+  contextLabel: '',
+  contextActive: false,
+};
 let mapDragState = null;
 let mapOffset = { x: 0, y: 0 };
 let mapFullscreenOpen = false;
 let resourceMapRows = [];
 const resourceLeafletMaps = {};
-let currentLanguage = localStorage.getItem('kpm.language') || 'zh';
+let currentLanguage = 'zh';
+localStorage.setItem('kpm.language', 'zh');
+let projectDetailReturnView = 'projects';
 let taskFormState = {
   project: projects[0].externalName,
   stage: projects[0].stages[0].name,
@@ -1268,11 +1283,11 @@ const i18nMessages = {
     },
     titles,
     login: {
-      account: '账号',
+      account: '登录邮箱',
       password: '密码',
       button: '登录',
-      hint: '演示账号：zhangmin / 123456',
-      accountPlaceholder: '请输入账号',
+      hint: '管理员账号：admin@kozenmobile.com / 123456',
+      accountPlaceholder: '请输入登录邮箱',
       passwordPlaceholder: '请输入密码',
       success: '登录成功，欢迎 {name}',
       failed: '账号或密码不正确',
@@ -1302,7 +1317,72 @@ const i18nMessages = {
       support: '技术支持情况',
       activity: '客户活跃度',
     },
-    notification: { title: '消息', internal: '内部消息', empty: '暂无未读消息' },
+    dashboard: {
+      taskTotal: '任务总数',
+      taskTotalHint: '与我相关的任务',
+      myOngoing: '我正在执行',
+      myOngoingHint: '执行人包含我，且任务未结束',
+      waitingOthers: '等待他人',
+      waitingOthersHint: '与我相关，但执行人是别人',
+      taskTotalFilter: '工作台 / 任务总数',
+      myOngoingFilter: '工作台 / 我正在执行',
+      waitingOthersFilter: '工作台 / 等待他人',
+      myProjects: '我的项目',
+      myProjectsHint: '点击项目名称查看详情',
+      viewAllProjects: '查看全部',
+      emptyProjects: '暂无与你关联的项目',
+    },
+    notification: {
+      title: '消息',
+      internal: '内部消息',
+      empty: '暂无消息',
+      emptyUnread: '暂无未读消息',
+      emptyRead: '暂无已读消息',
+      all: '全部',
+      unread: '未读',
+      read: '已读',
+      markRead: '标记已读',
+      markAllRead: '一键已读',
+      unreadStatus: '未读',
+      readStatus: '已读',
+    },
+    taskList: {
+      searchPlaceholder: '搜索任务编号 / 标题 / 阶段 / 客户',
+      allProject: '全部项目',
+      allStatus: '全部状态',
+      allPriority: '全部优先级',
+      allAssignee: '全部执行者',
+      allCategory: '全部分类',
+      create: '新建任务',
+      context: '当前任务上下文',
+      clearContext: '清除任务上下文',
+      countSuffix: '个任务',
+      form: {
+        title: '任务标题',
+        titlePlaceholder: '例如 确认海外版本支付语言包',
+        description: '任务描述',
+        descriptionPlaceholder: '说明任务背景、目标和交付标准',
+        project: '所属项目',
+        stage: '来源阶段',
+        category: '任务分类',
+        priority: '优先级',
+        assignee: '执行者',
+        participant: '参与者',
+        peoplePlaceholder: '搜索姓名，支持多人',
+        expectedCompletionAt: '预期完成时间',
+        creator: '创建者',
+        cancel: '取消',
+        save: '保存任务',
+      },
+      panelTitle: '任务列表',
+      panelDescription: '产品逻辑参考 Jira，并保留 KPM 的项目 / 阶段上下文',
+      headers: { id: '编号', title: '标题', category: '分类', project: '项目', stage: '来源阶段', status: '状态', priority: '优先级', creator: '创建者', assignee: '执行者', participant: '参与者', expectedCompletionAt: '预期完成时间', source: '来源' },
+      empty: '暂无匹配任务',
+      unassigned: '待分配',
+      activityFilterLabel: '客户 {customer} / 项目 {project} 的进行中任务',
+      supportFilterLabel: '客户 {customer} / 技术支持 {support} / {category}任务',
+      activeTaskCount: '进行中任务',
+    },
     language: '中文 / EN',
   },
   en: {
@@ -1338,11 +1418,11 @@ const i18nMessages = {
       'create-project': ['Create Project', 'Initialize a project in four steps'],
     },
     login: {
-      account: 'Account',
+      account: 'Email',
       password: 'Password',
       button: 'Sign in',
-      hint: 'Demo account: zhangmin / 123456',
-      accountPlaceholder: 'Enter account',
+      hint: 'Admin account: admin@kozenmobile.com / 123456',
+      accountPlaceholder: 'Enter login email',
       passwordPlaceholder: 'Enter password',
       success: 'Signed in. Welcome {name}',
       failed: 'Invalid account or password',
@@ -1372,13 +1452,90 @@ const i18nMessages = {
       support: 'Support Status',
       activity: 'Customer Activity',
     },
-    notification: { title: 'Messages', internal: 'Internal Messages', empty: 'No unread messages' },
+    dashboard: {
+      taskTotal: 'Total tasks',
+      taskTotalHint: 'Tasks related to me',
+      myOngoing: 'My in-progress',
+      myOngoingHint: 'Assigned to me and not finished',
+      waitingOthers: 'Waiting on others',
+      waitingOthersHint: 'Related to me, assigned to someone else',
+      taskTotalFilter: 'Dashboard / Total tasks',
+      myOngoingFilter: 'Dashboard / My in-progress',
+      waitingOthersFilter: 'Dashboard / Waiting on others',
+      myProjects: 'My Projects',
+      myProjectsHint: 'Click a project name to view details',
+      viewAllProjects: 'View all',
+      emptyProjects: 'No projects related to you',
+    },
+    notification: {
+      title: 'Messages',
+      internal: 'Internal Messages',
+      empty: 'No messages',
+      emptyUnread: 'No unread messages',
+      emptyRead: 'No read messages',
+      all: 'All',
+      unread: 'Unread',
+      read: 'Read',
+      markRead: 'Mark read',
+      markAllRead: 'Mark all read',
+      unreadStatus: 'Unread',
+      readStatus: 'Read',
+    },
+    taskList: {
+      searchPlaceholder: 'Search ID / title / stage / customer',
+      allProject: 'All projects',
+      allStatus: 'All statuses',
+      allPriority: 'All priorities',
+      allAssignee: 'All assignees',
+      allCategory: 'All categories',
+      create: 'New task',
+      context: 'Current task context',
+      clearContext: 'Clear context',
+      countSuffix: 'tasks',
+      form: {
+        title: 'Task title',
+        titlePlaceholder: 'e.g. Confirm overseas payment language pack',
+        description: 'Task description',
+        descriptionPlaceholder: 'Describe background, goal and acceptance criteria',
+        project: 'Project',
+        stage: 'Source stage',
+        category: 'Task category',
+        priority: 'Priority',
+        assignee: 'Assignees',
+        participant: 'Participants',
+        peoplePlaceholder: 'Search existing users; multiple supported',
+        expectedCompletionAt: 'Expected completion date',
+        creator: 'Creator',
+        cancel: 'Cancel',
+        save: 'Save task',
+      },
+      panelTitle: 'Task List',
+      panelDescription: 'Jira-inspired task management with KPM project / stage context',
+      headers: { id: 'ID', title: 'Title', category: 'Category', project: 'Project', stage: 'Source stage', status: 'Status', priority: 'Priority', creator: 'Creator', assignee: 'Assignees', participant: 'Participants', expectedCompletionAt: 'Expected completion', source: 'Source' },
+      empty: 'No matching tasks',
+      unassigned: 'Unassigned',
+      activityFilterLabel: 'Active tasks for customer {customer} / project {project}',
+      supportFilterLabel: 'Customer {customer} / support {support} / {category} tasks',
+      activeTaskCount: 'Active tasks',
+    },
     language: 'EN / 中文',
   },
 };
 
 function textFor(path, fallback = '') {
   return path.split('.').reduce((value, key) => value?.[key], i18nMessages[currentLanguage]) || fallback;
+}
+
+function formatText(template, values = {}) {
+  return String(template || '').replace(/\{(\w+)\}/g, (_, key) => values[key] ?? '');
+}
+
+function escapeAttr(value = '') {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 function applyLanguage() {
@@ -1405,20 +1562,60 @@ function applyLanguage() {
 }
 
 
+function isNotificationRead(message) {
+  return Boolean(message.read || message.readFlag);
+}
+
+function notificationEmptyText() {
+  if (notificationFilter === 'unread') return textFor('notification.emptyUnread', '暂无未读消息');
+  if (notificationFilter === 'read') return textFor('notification.emptyRead', '暂无已读消息');
+  return textFor('notification.empty', '暂无消息');
+}
+
+function renderNotificationList(messages = []) {
+  const filteredMessages = messages.filter((message) => {
+    const read = isNotificationRead(message);
+    if (notificationFilter === 'unread') return !read;
+    if (notificationFilter === 'read') return read;
+    return true;
+  });
+  const filterButtons = `
+    <div class="notification-actions">
+      <div class="notification-filters">
+        ${['all', 'unread', 'read'].map((filter) => `
+          <button class="notification-filter-btn ${notificationFilter === filter ? 'active' : ''}" data-action="set-notification-filter" data-notification-filter="${filter}">
+            ${textFor(`notification.${filter}`, filter)}
+          </button>
+        `).join('')}
+      </div>
+      <button class="muted-btn compact-btn" data-action="mark-all-notifications-read">${textFor('notification.markAllRead', '一键已读')}</button>
+    </div>
+  `;
+  const body = filteredMessages.map((message) => {
+    const read = isNotificationRead(message);
+    return `
+      <article class="notification-item ${read ? 'read' : 'unread'}">
+        <div class="notification-item-head">
+          <strong>${escapeAttr(message.title)}</strong>
+          <span class="notification-status ${read ? 'read' : 'unread'}">${read ? textFor('notification.readStatus', '已读') : textFor('notification.unreadStatus', '未读')}</span>
+        </div>
+        <small>${escapeAttr(message.createdAt || '')}</small>
+        <p>${escapeAttr(message.content)}</p>
+        ${read ? '' : `<button class="inline-link notification-item-action" data-action="mark-notification-read" data-message-id="${escapeAttr(message.id)}">${textFor('notification.markRead', '标记已读')}</button>`}
+      </article>
+    `;
+  }).join('') || `<p class="empty-note">${notificationEmptyText()}</p>`;
+  return `${filterButtons}<div class="notification-list-scroll">${body}</div>`;
+}
+
 async function refreshNotifications({ loadList = false } = {}) {
   if (!currentSession?.token || !notificationCount) return;
   try {
     const unread = await kpmApi.get('/api/notifications/unread-count');
     notificationCount.textContent = String(unread.count || 0);
     if (loadList && notificationList) {
-      const messages = await kpmApi.get('/api/notifications/messages?unreadOnly=true');
-      notificationList.innerHTML = (messages || []).map((message) => `
-        <article class="notification-item">
-          <strong>${message.title}</strong>
-          <small>${message.createdAt || ''}</small>
-          <p>${message.content}</p>
-        </article>
-      `).join('') || `<p class="empty-note">${textFor('notification.empty', '暂无未读消息')}</p>`;
+      const messages = await kpmApi.get('/api/notifications/messages?unreadOnly=false');
+      notificationList.innerHTML = renderNotificationList(messages || []);
     }
   } catch (error) {
     console.warn('[KPM] notification refresh skipped', error);
@@ -1443,7 +1640,7 @@ function stopNotificationRefresh() {
   if (notificationRefreshTimer) clearInterval(notificationRefreshTimer);
   notificationRefreshTimer = null;
   if (notificationCount) notificationCount.textContent = '0';
-  if (notificationList) notificationList.innerHTML = `<p class="empty-note">${textFor('notification.empty', '暂无未读消息')}</p>`;
+  if (notificationList) notificationList.innerHTML = `<p class="empty-note">${textFor('notification.emptyUnread', '暂无未读消息')}</p>`;
 }
 
 
@@ -1697,7 +1894,8 @@ function renderFileRows(files = [], options = {}) {
 
 function renderDownloadButton(file = {}) {
   const objectKey = file.objectKey || '';
-  return `<button class="ghost-btn" data-action="download-file" data-object-key="${attrValue(objectKey)}">下载</button>`;
+  const fileName = fileTitle(file);
+  return `<button class="ghost-btn" data-action="download-file" data-object-key="${attrValue(objectKey)}" data-file-name="${attrValue(fileName)}">下载</button>`;
 }
 
 function renderStageFileActions(file, project) {
@@ -1864,6 +2062,11 @@ function requiredMaxLength(max) {
 function optionalEmailValue(value) {
   const text = String(value ?? '').trim();
   return !text || (text.length <= 128 && EMAIL_PATTERN.test(text));
+}
+
+function requiredEmailValue(value) {
+  const text = String(value ?? '').trim();
+  return text.length > 0 && text.length <= 128 && EMAIL_PATTERN.test(text);
 }
 
 function optionalPhoneValue(value) {
@@ -2246,8 +2449,15 @@ async function openFileDownload(file) {
     showToast('该文件还没有真实 OSS objectKey，可能是历史种子数据或上传未完成。', 'warning');
     return;
   }
-  const result = await kpmApi.downloadUrl(file.objectKey);
-  window.open(result.url, '_blank', 'noopener,noreferrer');
+  const fileName = file.fileName || file.name || fileTitle(file);
+  const result = await kpmApi.downloadUrl(file.objectKey, fileName);
+  const anchor = document.createElement('a');
+  anchor.href = result.url;
+  anchor.download = fileName || '';
+  anchor.rel = 'noopener noreferrer';
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
 }
 
 function nextTaskId() {
@@ -2517,26 +2727,108 @@ function nextProjectId(externalName) {
   return candidate;
 }
 
-function renderDashboard() {
-  myProjects.innerHTML = projects.filter((project) => !project.archived).slice(0, 2).map((project) => `
-    <article class="project-card">
-      <div>
-        <h3>${project.externalName}</h3>
-        <p>${project.internalName} / ${project.modelName}</p>
-      </div>
-      <div>
-        <strong>${ongoingStageNames(project).join('、') || '暂无进行中阶段'}</strong>
-        <p>进行中阶段</p>
-      </div>
-      <div>
-        <strong>${projectManagerName(project)}</strong>
-        <p>项目负责人</p>
-      </div>
-      <button class="ghost-btn" data-project-id="${project.id}">查看详情</button>
-    </article>
+function currentUserIdentityValues() {
+  return new Set([currentUser, currentAccount, userName(currentAccount)].map((value) => String(value || '').trim()).filter(Boolean));
+}
+
+function personListContainsCurrentUser(values = []) {
+  const identities = currentUserIdentityValues();
+  return values.some((value) => identities.has(String(value || '').trim()));
+}
+
+function isTaskFinished(task) {
+  return ['完成', '拒绝'].includes(taskStatusSemantic(task.status));
+}
+
+function isTaskRelatedToCurrentUser(task) {
+  return personListContainsCurrentUser([
+    task.creator,
+    ...(task.participants || []),
+    ...taskAssigneeNames(task),
+  ]);
+}
+
+function isTaskAssignedToCurrentUser(task) {
+  return personListContainsCurrentUser(taskAssigneeNames(task));
+}
+
+function currentUserTaskStats() {
+  const relatedTasks = tasks.filter(isTaskRelatedToCurrentUser);
+  const activeRelatedTasks = relatedTasks.filter((task) => !isTaskFinished(task));
+  const myOngoingTasks = activeRelatedTasks.filter(isTaskAssignedToCurrentUser);
+  const waitingOthersTasks = activeRelatedTasks.filter((task) => !isTaskAssignedToCurrentUser(task));
+  return {
+    total: relatedTasks.length,
+    totalTasks: relatedTasks,
+    myOngoing: myOngoingTasks.length,
+    myOngoingTasks,
+    waitingOthers: waitingOthersTasks.length,
+    waitingOthersTasks,
+  };
+}
+
+function isProjectRelatedToCurrentUser(project) {
+  if (!project || project.archived) return false;
+  if (project.managerAccount === currentAccount) return true;
+  return (project.members || []).some((member) => member.userAccount === currentAccount || member.name === currentUser);
+}
+
+function projectBubbleClass(index) {
+  return `project-bubble-card tone-${(index % 6) + 1}`;
+}
+
+function renderDashboardSummary() {
+  if (!dashboardSummary) return;
+  const stats = currentUserTaskStats();
+  const cards = [
+    {
+      key: 'taskTotal',
+      hint: 'taskTotalHint',
+      filter: 'taskTotalFilter',
+      value: stats.total,
+      taskIds: stats.totalTasks.map((task) => task.id),
+      className: 'task-total',
+    },
+    {
+      key: 'myOngoing',
+      hint: 'myOngoingHint',
+      filter: 'myOngoingFilter',
+      value: stats.myOngoing,
+      taskIds: stats.myOngoingTasks.map((task) => task.id),
+      className: 'task-ongoing',
+    },
+    {
+      key: 'waitingOthers',
+      hint: 'waitingOthersHint',
+      filter: 'waitingOthersFilter',
+      value: stats.waitingOthers,
+      taskIds: stats.waitingOthersTasks.map((task) => task.id),
+      className: 'task-waiting',
+    },
+  ];
+  dashboardSummary.innerHTML = cards.map((card) => `
+    <button class="summary-card dashboard-task-card ${card.className}" data-action="open-task-list-filter" data-task-ids="${card.taskIds.join(',')}" data-filter-label="${escapeAttr(textFor(`dashboard.${card.filter}`, '工作台任务'))}">
+      <span>${textFor(`dashboard.${card.key}`, card.key)}</span>
+      <strong>${card.value}</strong>
+      <small>${textFor(`dashboard.${card.hint}`, '')}</small>
+    </button>
   `).join('');
 }
 
+function renderDashboardProjects() {
+  const relatedProjects = projects.filter(isProjectRelatedToCurrentUser);
+  myProjects.classList.add('project-bubble-list');
+  myProjects.innerHTML = relatedProjects.map((project, index) => `
+    <button class="${projectBubbleClass(index)}" data-project-id="${project.id}" title="${escapeAttr(`${project.externalName} / ${project.internalName} / ${project.modelName}`)}">
+      <span>${escapeAttr(project.externalName)}</span>
+    </button>
+  `).join('') || `<p class="empty-note">${textFor('dashboard.emptyProjects', '暂无与你关联的项目')}</p>`;
+}
+
+function renderDashboard() {
+  renderDashboardSummary();
+  renderDashboardProjects();
+}
 function renderProjectTable(filter = '') {
   const normalized = filter.trim().toLowerCase();
   const salesability = salesabilityFilter?.value || '全部销售状态';
@@ -2573,7 +2865,27 @@ function renderProjectTable(filter = '') {
   `).join('') || '<tr><td colspan="9">暂无匹配项目</td></tr>';
 }
 
+function projectDetailBackLabel() {
+  if (projectDetailReturnView === 'dashboard') return '← 返回工作台';
+  if (projectDetailReturnView === 'customer-detail') return '← 返回客户详情';
+  return '← 返回项目列表';
+}
+
+function updateProjectDetailBackButton() {
+  if (!projectDetailBack) return;
+  projectDetailBack.textContent = projectDetailBackLabel();
+}
+
+function backFromProjectDetail() {
+  const view = projectDetailReturnView || 'projects';
+  if (view === 'dashboard') renderDashboard();
+  if (view === 'projects') renderProjectTable(projectSearch?.value || '');
+  if (view === 'customer-detail') renderCustomerDetail();
+  showView(view);
+}
+
 function renderProjectDetail() {
+  updateProjectDetailBackButton();
   const project = projects.find((item) => item.id === selectedProjectId);
   if (!project) {
     projectDetail.innerHTML = '<section class="panel"><p class="empty-note">暂无项目数据</p></section>';
@@ -3143,7 +3455,7 @@ async function applyConfirmationDialog() {
     confirmationDialog = null;
     await refreshBusinessDataAfterWrite(`confirm-${dialog.type}`);
     if (currentView === 'stage-detail') renderStageDetail();
-    if (dialog.type === 'project-delete' && currentView === 'project-detail') showView('projects');
+    if (dialog.type === 'project-delete' && currentView === 'project-detail') backFromProjectDetail();
   } catch (error) {
     reportBackendWriteError(dialog.type, error);
   }
@@ -3909,108 +4221,144 @@ function renderProjectMaterials() {
   `;
 }
 
+function taskFilterOption(value, selectedValue, label = value) {
+  return `<option value="${escapeAttr(value)}" ${value === selectedValue ? 'selected' : ''}>${escapeAttr(label)}</option>`;
+}
+
+function resetTaskListFiltersForContext(taskIds = [], contextLabel = '', contextActive = Boolean(contextLabel)) {
+  taskListFilters = {
+    keyword: '',
+    project: '全部项目',
+    status: '全部状态',
+    priority: '全部优先级',
+    assignee: '全部执行者',
+    category: '全部分类',
+    taskIds: [...taskIds],
+    contextLabel,
+    contextActive,
+  };
+}
+
 function renderTaskManagement() {
-  const keyword = document.getElementById('task-keyword')?.value.trim().toLowerCase() || '';
-  const projectFilter = document.getElementById('task-project-filter')?.value || '全部项目';
-  const statusFilter = document.getElementById('task-status-filter')?.value || '全部状态';
-  const priorityFilter = document.getElementById('task-priority-filter')?.value || '全部优先级';
-  const assigneeFilter = document.getElementById('task-assignee-filter')?.value || '全部执行者';
-  const categoryFilter = document.getElementById('task-category-filter')?.value || '全部分类';
+  const keywordRaw = taskListFilters.keyword || '';
+  const keyword = keywordRaw.trim().toLowerCase();
+  const projectFilter = taskListFilters.project || '全部项目';
+  const statusFilter = taskListFilters.status || '全部状态';
+  const priorityFilter = taskListFilters.priority || '全部优先级';
+  const assigneeFilter = taskListFilters.assignee || '全部执行者';
+  const categoryFilter = taskListFilters.category || '全部分类';
+  const contextActive = taskListFilters.contextActive === true;
+  const contextTaskIds = taskListFilters.taskIds || [];
+  const contextTaskIdSet = contextActive ? new Set(contextTaskIds) : null;
 
   const filteredTasks = tasks.filter((task) => {
+    const matchesContext = !contextTaskIdSet || contextTaskIdSet.has(task.id);
     const matchesKeyword = !keyword || [
       task.id,
       task.title,
       task.stage,
       task.category,
       task.description,
+      task.customerName,
       ...taskAssigneeNames(task),
       ...(task.participants || []),
-    ].some((value) => value.toLowerCase().includes(keyword));
+    ].some((value) => String(value || '').toLowerCase().includes(keyword));
     const matchesProject = projectFilter === '全部项目' || task.project === projectFilter;
     const matchesStatus = statusFilter === '全部状态' || task.status === statusFilter;
     const matchesPriority = priorityFilter === '全部优先级' || task.priority === priorityFilter;
     const matchesAssignee = assigneeFilter === '全部执行者' || taskAssigneeNames(task).includes(assigneeFilter);
     const matchesCategory = categoryFilter === '全部分类' || task.category === categoryFilter;
-    return matchesKeyword && matchesProject && matchesStatus && matchesPriority && matchesAssignee && matchesCategory;
+    return matchesContext && matchesKeyword && matchesProject && matchesStatus && matchesPriority && matchesAssignee && matchesCategory;
   });
 
   taskManagement.innerHTML = `
     <div class="toolbar task-toolbar">
-      <input id="task-keyword" type="search" value="${keyword}" placeholder="搜索任务编号 / 标题 / 阶段" />
+      <input id="task-keyword" type="search" value="${escapeAttr(keywordRaw)}" placeholder="${textFor('taskList.searchPlaceholder', '搜索任务编号 / 标题 / 阶段 / 客户')}" />
       <select id="task-project-filter" class="select-input compact-filter">
-        ${['全部项目', ...new Set(tasks.map((task) => task.project))].map((item) => `<option ${item === projectFilter ? 'selected' : ''}>${item}</option>`).join('')}
+        ${taskFilterOption('全部项目', projectFilter, textFor('taskList.allProject', '全部项目'))}
+        ${[...new Set(tasks.map((task) => task.project))].map((item) => taskFilterOption(item, projectFilter)).join('')}
       </select>
       <select id="task-status-filter" class="select-input compact-filter">
-        ${['全部状态', ...activeTaskStatusNames()].map((item) => `<option ${item === statusFilter ? 'selected' : ''}>${item}</option>`).join('')}
+        ${taskFilterOption('全部状态', statusFilter, textFor('taskList.allStatus', '全部状态'))}
+        ${activeTaskStatusNames().map((item) => taskFilterOption(item, statusFilter)).join('')}
       </select>
       <select id="task-priority-filter" class="select-input compact-filter">
-        ${['全部优先级', ...priorityOptions].map((item) => `<option ${item === priorityFilter ? 'selected' : ''}>${item}</option>`).join('')}
+        ${taskFilterOption('全部优先级', priorityFilter, textFor('taskList.allPriority', '全部优先级'))}
+        ${priorityOptions.map((item) => taskFilterOption(item, priorityFilter)).join('')}
       </select>
       <select id="task-assignee-filter" class="select-input compact-filter">
-        ${['全部执行者', ...new Set(tasks.flatMap((task) => taskAssigneeNames(task)))].map((item) => `<option ${item === assigneeFilter ? 'selected' : ''}>${item}</option>`).join('')}
+        ${taskFilterOption('全部执行者', assigneeFilter, textFor('taskList.allAssignee', '全部执行者'))}
+        ${[...new Set(tasks.flatMap((task) => taskAssigneeNames(task)))].map((item) => taskFilterOption(item, assigneeFilter)).join('')}
       </select>
       <select id="task-category-filter" class="select-input compact-filter">
-        ${['全部分类', ...taskCategoryOptions].map((item) => `<option ${item === categoryFilter ? 'selected' : ''}>${item}</option>`).join('')}
+        ${taskFilterOption('全部分类', categoryFilter, textFor('taskList.allCategory', '全部分类'))}
+        ${taskCategoryOptions.map((item) => taskFilterOption(item, categoryFilter)).join('')}
       </select>
-      <button class="primary-btn" data-action="toggle-task-form">新建任务</button>
+      <button class="primary-btn" data-action="toggle-task-form">${textFor('taskList.create', '新建任务')}</button>
     </div>
+
+    ${contextActive ? `
+      <div class="context-filter-banner">
+        <span><strong>${textFor('taskList.context', '当前任务上下文')}</strong> · ${escapeAttr(taskListFilters.contextLabel || '')} · ${filteredTasks.length}/${contextTaskIds.length} ${textFor('taskList.countSuffix', '个任务')}</span>
+        <button class="muted-btn compact-btn" data-action="clear-task-context-filter">${textFor('taskList.clearContext', '清除任务上下文')}</button>
+      </div>
+    ` : ''}
 
     ${taskFormOpen ? renderFormModal(`
       <div class="panel task-form-panel">
         <div class="form-grid">
           <div class="form-field full">
-            <label>任务标题</label>
-            <input id="task-title" class="text-input" maxlength="120" placeholder="例如 确认海外版本支付语言包" />
+            <label>${textFor('taskList.form.title', '任务标题')}</label>
+            <input id="task-title" class="text-input" maxlength="120" placeholder="${textFor('taskList.form.titlePlaceholder', '例如 确认海外版本支付语言包')}" />
           </div>
           <div class="form-field full">
-            <label>任务描述</label>
-            <textarea id="task-description" rows="3" maxlength="3000" placeholder="说明任务背景、目标和交付标准"></textarea>
+            <label>${textFor('taskList.form.description', '任务描述')}</label>
+            <textarea id="task-description" rows="3" maxlength="3000" placeholder="${textFor('taskList.form.descriptionPlaceholder', '说明任务背景、目标和交付标准')}"></textarea>
           </div>
           <div class="form-field">
-            <label>所属项目</label>
+            <label>${textFor('taskList.form.project', '所属项目')}</label>
             <select id="task-project" class="select-input">
-              ${projects.map((project) => `<option ${taskFormState.project === project.externalName ? 'selected' : ''}>${project.externalName}</option>`).join('')}
+              ${projects.map((project) => taskFilterOption(project.externalName, taskFormState.project)).join('')}
             </select>
           </div>
           <div class="form-field">
-            <label>来源阶段</label>
+            <label>${textFor('taskList.form.stage', '来源阶段')}</label>
             <select id="task-stage" class="select-input">
-              ${projects.find((project) => project.externalName === taskFormState.project)?.stages.map((stage) => `<option ${taskFormState.stage === stage.name ? 'selected' : ''}>${stage.name}</option>`).join('') || ''}
+              ${projects.find((project) => project.externalName === taskFormState.project)?.stages.map((stage) => taskFilterOption(stage.name, taskFormState.stage)).join('') || ''}
             </select>
           </div>
           <div class="form-field">
-            <label>任务分类</label>
+            <label>${textFor('taskList.form.category', '任务分类')}</label>
             <select id="task-category" class="select-input">
-              ${taskCategoryOptions.map((category) => `<option ${taskFormState.category === category ? 'selected' : ''}>${category}</option>`).join('')}
+              ${taskCategoryOptions.map((category) => taskFilterOption(category, taskFormState.category)).join('')}
             </select>
           </div>
           <div class="form-field">
-            <label>优先级</label>
+            <label>${textFor('taskList.form.priority', '优先级')}</label>
             <select id="task-priority" class="select-input">
-              ${priorityOptions.map((priority) => `<option ${priority === '中' ? 'selected' : ''}>${priority}</option>`).join('')}
+              ${priorityOptions.map((priority) => taskFilterOption(priority, '中')).join('')}
             </select>
           </div>
           <div class="form-field">
-            <label>执行者</label>
-            ${searchablePeopleInput('task-assignees', [], '搜索姓名，支持多人')}
+            <label>${textFor('taskList.form.assignee', '执行者')}</label>
+            ${searchablePeopleInput('task-assignees', [], textFor('taskList.form.peoplePlaceholder', '搜索姓名，支持多人'))}
           </div>
           <div class="form-field">
-            <label>参与者</label>
-            ${searchablePeopleInput('task-participants', [], '搜索姓名，支持多人')}
+            <label>${textFor('taskList.form.participant', '参与者')}</label>
+            ${searchablePeopleInput('task-participants', [], textFor('taskList.form.peoplePlaceholder', '搜索姓名，支持多人'))}
           </div>
           <div class="form-field">
-            <label>预期完成时间</label>
+            <label>${textFor('taskList.form.expectedCompletionAt', '预期完成时间')}</label>
             <input id="task-expected-completion-at" class="text-input" type="date" value="2026-05-30" />
           </div>
           <div class="form-field">
-            <label>创建者</label>
+            <label>${textFor('taskList.form.creator', '创建者')}</label>
             <input class="text-input" value="${currentUser}" disabled />
           </div>
         </div>
         <div class="customer-form-actions">
-          <button class="muted-btn" data-action="toggle-task-form">取消</button>
-          <button class="primary-btn" data-action="save-task">保存任务</button>
+          <button class="muted-btn" data-action="toggle-task-form">${textFor('taskList.form.cancel', '取消')}</button>
+          <button class="primary-btn" data-action="save-task">${textFor('taskList.form.save', '保存任务')}</button>
         </div>
       </div>
     `, 'wide') : ''}
@@ -4018,26 +4366,26 @@ function renderTaskManagement() {
     <div class="panel">
       <div class="panel-head">
         <div>
-          <h2>任务列表</h2>
-          <p>产品逻辑参考 Jira，并保留 KPM 的项目 / 阶段上下文</p>
+          <h2>${textFor('taskList.panelTitle', '任务列表')}</h2>
+          <p>${textFor('taskList.panelDescription', '产品逻辑参考 Jira，并保留 KPM 的项目 / 阶段上下文')}</p>
         </div>
       </div>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>编号</th>
-              <th>标题</th>
-              <th>分类</th>
-              <th>项目</th>
-              <th>来源阶段</th>
-              <th>状态</th>
-              <th>优先级</th>
-              <th>创建者</th>
-              <th>执行者</th>
-              <th>参与者</th>
-              <th>预期完成时间</th>
-              <th>来源</th>
+              <th>${textFor('taskList.headers.id', '编号')}</th>
+              <th>${textFor('taskList.headers.title', '标题')}</th>
+              <th>${textFor('taskList.headers.category', '分类')}</th>
+              <th>${textFor('taskList.headers.project', '项目')}</th>
+              <th>${textFor('taskList.headers.stage', '来源阶段')}</th>
+              <th>${textFor('taskList.headers.status', '状态')}</th>
+              <th>${textFor('taskList.headers.priority', '优先级')}</th>
+              <th>${textFor('taskList.headers.creator', '创建者')}</th>
+              <th>${textFor('taskList.headers.assignee', '执行者')}</th>
+              <th>${textFor('taskList.headers.participant', '参与者')}</th>
+              <th>${textFor('taskList.headers.expectedCompletionAt', '预期完成时间')}</th>
+              <th>${textFor('taskList.headers.source', '来源')}</th>
             </tr>
           </thead>
           <tbody>
@@ -4051,19 +4399,18 @@ function renderTaskManagement() {
                 <td><span class="badge ${taskBadgeClass(task.status)}">${task.status}</span></td>
                 <td>${task.priority}</td>
                 <td>${task.creator}</td>
-                <td>${taskPersonLabel(taskAssigneeNames(task), '待分配')}</td>
+                <td>${taskPersonLabel(taskAssigneeNames(task), textFor('taskList.unassigned', '待分配'))}</td>
                 <td>${taskPersonLabel(task.participants)}</td>
                 <td>${task.expectedCompletionAt || '-'}</td>
                 <td>${task.source}</td>
               </tr>
-            `).join('') || '<tr><td colspan="12">暂无匹配任务</td></tr>'}
+            `).join('') || `<tr><td colspan="12">${textFor('taskList.empty', '暂无匹配任务')}</td></tr>`}
           </tbody>
         </table>
       </div>
     </div>
   `;
 }
-
 function renderTaskDetail() {
   const task = tasks.find((item) => item.id === selectedTaskId);
   const linked = findRequirementByTaskId(task.id);
@@ -5129,6 +5476,14 @@ function renderActivityDetailModal() {
   const cell = projectCustomerActivityCell(selectedActivityCell.projectName, selectedActivityCell.customerName);
   const customer = customerByName(selectedActivityCell.customerName);
   if (!customer || cell.status === '-') return '';
+  const activeTaskIds = cell.activeTasks.map((task) => task.id);
+  const activeTaskFilterLabel = formatText(textFor('taskList.activityFilterLabel', '客户 {customer} / 项目 {project} 的进行中任务'), {
+    customer: customer.name,
+    project: cell.projectName,
+  });
+  const activeTaskCountControl = activeTaskIds.length
+    ? `<button class="inline-link metric-link" data-action="open-task-list-filter" data-task-ids="${activeTaskIds.join(',')}" data-filter-label="${escapeAttr(activeTaskFilterLabel)}">${activeTaskIds.length}</button>`
+    : '<strong>0</strong>';
   return `
     <div class="modal-backdrop">
       <section class="modal-card form-modal wide">
@@ -5145,22 +5500,12 @@ function renderActivityDetailModal() {
           <div><span>最近有效活动</span><strong>${cell.lastDate || '-'}</strong></div>
           <div><span>负责销售</span><strong>${taskPersonLabel(customer.salesOwners)}</strong></div>
           <div><span>负责技术支持</span><strong>${taskPersonLabel(customer.supportOwners)}</strong></div>
-          <div><span>进行中任务</span><strong>${cell.activeTasks.length}</strong></div>
+          <div><span>${textFor('taskList.activeTaskCount', '进行中任务')}</span>${activeTaskCountControl}</div>
           <div><span>订单数量</span><strong>${cell.orders.length}</strong></div>
         </div>
         <section class="sub-panel activity-modal-section">
           <h3>建议动作</h3>
           <p>${cell.suggestion}</p>
-        </section>
-        <section class="sub-panel activity-modal-section">
-          <h3>进行中任务</h3>
-          ${cell.activeTasks.map((task) => `
-            <div class="transition-row">
-              <span>${task.id}</span>
-              <strong>${task.title}</strong>
-              <button class="ghost-btn" data-action="open-task-detail" data-task-id="${task.id}" data-return-view="analytics">进入任务详情</button>
-            </div>
-          `).join('') || '<p class="empty-note">暂无进行中任务</p>'}
         </section>
         <div class="customer-form-actions">
           <button class="primary-btn" data-action="close-activity-cell">关闭</button>
@@ -5446,16 +5791,25 @@ function renderSupportAnalytics() {
               <article class="support-branch">
                 <h3>${supportName}</h3>
                 <div class="support-task-stats">
-                  ${categoryGroups.map((group) => `
-                    <button
-                      class="support-stat ${group.tone}"
-                      title="${group.tasks.map((task) => `${task.id} ${task.title}`).join('｜') || '暂无任务'}"
-                      data-action="${group.tasks[0] ? 'open-support-task-modal' : ''}"
-                      data-task-id="${group.tasks[0]?.id || ''}"
-                    >
-                      ${group.label} ${group.tasks.length}
-                    </button>
-                  `).join('')}
+                  ${categoryGroups.map((group) => {
+                    const taskIds = group.tasks.map((task) => task.id);
+                    const filterLabel = formatText(textFor('taskList.supportFilterLabel', '客户 {customer} / 技术支持 {support} / {category}任务'), {
+                      customer: customer.name,
+                      support: supportName,
+                      category: group.label,
+                    });
+                    return `
+                      <button
+                        class="support-stat ${group.tone}"
+                        title="${group.tasks.length ? `${group.tasks.length} ${textFor('taskList.countSuffix', '个任务')}` : '暂无任务'}"
+                        data-action="${taskIds.length ? 'open-task-list-filter' : ''}"
+                        data-task-ids="${taskIds.join(',')}"
+                        data-filter-label="${escapeAttr(filterLabel)}"
+                      >
+                        ${group.label} ${group.tasks.length}
+                      </button>
+                    `;
+                  }).join('')}
                 </div>
               </article>
             `;
@@ -5463,35 +5817,6 @@ function renderSupportAnalytics() {
         </div>
       </div>
     </section>
-    ${supportTaskModalId ? renderSupportTaskModal() : ''}
-  `;
-}
-
-function renderSupportTaskModal() {
-  const task = tasks.find((item) => item.id === supportTaskModalId);
-  if (!task) return '';
-  return `
-    <div class="modal-backdrop">
-      <section class="modal-card">
-        <div class="panel-head">
-          <div>
-            <h2>${task.id} · ${task.title}</h2>
-            <p>${task.project} / ${task.stage}</p>
-          </div>
-        </div>
-        <div class="detail-facts">
-          <div><span>分类</span><strong>${task.category}</strong></div>
-          <div><span>状态</span><strong>${task.status}</strong></div>
-          <div><span>执行者</span><strong>${taskPersonLabel(taskAssigneeNames(task), '待分配')}</strong></div>
-          <div><span>参与者</span><strong>${taskPersonLabel(task.participants)}</strong></div>
-          <div><span>任务描述</span><strong>${task.description || '-'}</strong></div>
-        </div>
-        <div class="customer-form-actions">
-          <button class="ghost-btn" data-action="open-task-detail" data-task-id="${task.id}" data-return-view="analytics">进入任务详情</button>
-          <button class="primary-btn" data-action="close-support-task-modal">关闭</button>
-        </div>
-      </section>
-    </div>
   `;
 }
 
@@ -6007,13 +6332,11 @@ function renderResourceForm() {
             <label>姓名</label>
             <input id="resource-user-name" class="text-input" maxlength="40" value="${editingItem?.name || ''}" placeholder="例如 张敏" />
           </div>
+          <input id="resource-user-account" type="hidden" value="${editingItem?.account || editingItem?.email || ''}" />
           <div class="form-field">
-            <label>账号</label>
-            <input id="resource-user-account" class="text-input" maxlength="128" value="${editingItem?.account || ''}" placeholder="默认使用邮箱，例如 user@kozen.com" />
-          </div>
-          <div class="form-field">
-            <label>邮箱</label>
-            <input id="resource-user-email" class="text-input" type="email" maxlength="128" value="${editingItem?.email || ''}" placeholder="用于接收通知邮件" />
+            <label>邮箱 / 登录账号</label>
+            <input id="resource-user-email" class="text-input" type="email" maxlength="128" value="${editingItem?.email || editingItem?.account || ''}" placeholder="例如 user@kozenmobile.com" />
+            <small class="field-hint">新增用户时邮箱必填，登录账号默认等于邮箱。</small>
           </div>
           <div class="form-field full">
             <label>所属部门</label>
@@ -6571,8 +6894,8 @@ function cloneAssignees(assignees) {
 
 const departmentDefaultOwnerAccounts = {
   销售部: ['zhaolei'],
-  产品部: ['zhangmin'],
-  运营部: ['zhangmin'],
+  产品部: ['admin@kozenmobile.com'],
+  运营部: ['admin@kozenmobile.com'],
   硬件部: ['wangwei'],
   软件部: ['lina'],
   测试部: ['zhouhang'],
@@ -6581,9 +6904,9 @@ const departmentDefaultOwnerAccounts = {
 };
 
 const stageDefaultOwnerAccounts = {
-  提出想法: ['zhaolei', 'zhangmin'],
-  讨论可行性: ['zhangmin'],
-  核算成本: ['zhangmin'],
+  提出想法: ['zhaolei', 'admin@kozenmobile.com'],
+  讨论可行性: ['admin@kozenmobile.com'],
+  核算成本: ['admin@kozenmobile.com'],
   硬件设计: ['wangwei'],
   软件适配: ['lina'],
   测试生产: ['zhouhang'],
@@ -7054,7 +7377,7 @@ function collectResourcePayload(tab, previousItem = {}) {
   if (tab === 'users') {
     return {
       name: document.getElementById('resource-user-name').value.trim(),
-      account: document.getElementById('resource-user-account').value.trim(),
+      account: document.getElementById('resource-user-email').value.trim(),
       email: document.getElementById('resource-user-email').value.trim(),
       departments: selectedCheckboxValues('[data-user-department]'),
       globalRoles: selectedCheckboxValues('[data-user-global-role]'),
@@ -7248,8 +7571,7 @@ function validateResourceForm(tab, payload) {
   if (tab === 'users') {
     return validateRequiredFields([
       { id: 'resource-user-name', label: '姓名', valid: requiredMaxLength(40), message: '姓名必填，且不能超过 40 个字符' },
-      { id: 'resource-user-account', label: '账号', valid: (value) => /^[A-Za-z0-9._%+@-]{3,128}$/.test(String(value).trim()), message: '账号长度 3-128 位，可以使用邮箱格式' },
-      { id: 'resource-user-email', label: '邮箱', valid: optionalEmailValue, message: '请输入正确的邮箱格式，例如 name@example.com' },
+      { id: 'resource-user-email', label: '邮箱 / 登录账号', valid: requiredEmailValue, message: '请输入正确的邮箱格式，例如 user@kozenmobile.com' },
     ]);
   }
   if (tab === 'departments') {
@@ -7805,6 +8127,7 @@ async function handleRealApiClick(action, actionTarget) {
     projectWizardDraft = null;
     wizardStep = 1;
     await refreshBusinessDataAfterWrite('project-create');
+    projectDetailReturnView = 'projects';
     showView('project-detail');
     return;
   }
@@ -8160,6 +8483,8 @@ document.addEventListener('click', async (event) => {
 
   const projectButton = event.target.closest('[data-project-id]:not([data-action])');
   if (projectButton) {
+    const sourceView = activeViewName();
+    projectDetailReturnView = sourceView === 'dashboard' ? 'dashboard' : 'projects';
     selectedProjectId = projectButton.dataset.projectId;
     renderProjectDetail();
     showView('project-detail');
@@ -8170,6 +8495,48 @@ document.addEventListener('click', async (event) => {
   const actionPermission = actionPermissionMap[action];
   if (actionPermission && !currentUserCan(actionPermission)) {
     showToast('当前账号没有该操作权限。', 'warning');
+    return;
+  }
+  if (action === 'set-notification-filter') {
+    notificationFilter = actionTarget.dataset.notificationFilter || 'unread';
+    await refreshNotifications({ loadList: true });
+    return;
+  }
+  if (action === 'mark-notification-read') {
+    try {
+      await kpmApi.post(`/api/notifications/messages/${actionTarget.dataset.messageId}/read`, {});
+      await refreshNotifications({ loadList: true });
+      showToast('消息已标记为已读。', 'success');
+    } catch (error) {
+      reportBackendWriteError('mark-notification-read', error);
+    }
+    return;
+  }
+  if (action === 'mark-all-notifications-read') {
+    try {
+      const result = await kpmApi.post('/api/notifications/messages/read-all', {});
+      await refreshNotifications({ loadList: true });
+      showToast(`已标记 ${result?.updated || 0} 条消息为已读。`, 'success');
+    } catch (error) {
+      reportBackendWriteError('mark-all-notifications-read', error);
+    }
+    return;
+  }
+  if (action === 'open-task-list-filter') {
+    const taskIds = String(actionTarget.dataset.taskIds || '').split(',').map((id) => id.trim()).filter(Boolean);
+    resetTaskListFiltersForContext(taskIds, actionTarget.dataset.filterLabel || '', true);
+    selectedActivityCell = null;
+    renderTaskManagement();
+    showView('tasks');
+    return;
+  }
+  if (action === 'clear-task-context-filter') {
+    resetTaskListFiltersForContext([], '', false);
+    renderTaskManagement();
+    return;
+  }
+  if (action === 'back-from-project-detail') {
+    backFromProjectDetail();
     return;
   }
   if (action === 'close-readable-modal') {
@@ -8210,7 +8577,7 @@ document.addEventListener('click', async (event) => {
   }
   if (action === 'download-file') {
     try {
-      await openFileDownload({ objectKey: actionTarget.dataset.objectKey });
+      await openFileDownload({ objectKey: actionTarget.dataset.objectKey, fileName: actionTarget.dataset.fileName });
     } catch (error) {
       reportBackendWriteError('download-file', error);
     }
@@ -8432,6 +8799,7 @@ document.addEventListener('click', async (event) => {
     showView('customer-detail');
   }
   if (action === 'open-linked-project') {
+    projectDetailReturnView = activeViewName();
     selectedProjectId = actionTarget.dataset.projectId;
     memberModalOpen = false;
     readableContentModal = null;
@@ -8868,6 +9236,7 @@ document.addEventListener('click', async (event) => {
       renderWizard();
     } else {
       createProjectFromWizard();
+      projectDetailReturnView = 'projects';
       renderProjectDetail();
       showView('project-detail');
     }
@@ -8985,7 +9354,7 @@ document.addEventListener('click', async (event) => {
 
     if (selectedResourceTab === 'users') {
       const name = document.getElementById('resource-user-name').value.trim();
-      const account = document.getElementById('resource-user-account').value.trim();
+      const account = document.getElementById('resource-user-email').value.trim();
       const departments = selectedCheckboxValues('[data-user-department]');
       if (name && account && departments.length) {
         nextItem = {
@@ -9316,23 +9685,13 @@ document.addEventListener('click', async (event) => {
   const analyticsTabButton = event.target.closest('[data-analytics-tab]');
   if (analyticsTabButton) {
     analyticsTab = analyticsTabButton.dataset.analyticsTab;
-    supportTaskModalId = null;
     selectedActivityCell = null;
     renderAnalytics();
   }
 
-  if (action === 'open-support-task-modal') {
-    supportTaskModalId = actionTarget.dataset.taskId;
-    renderSupportAnalytics();
-  }
-  if (action === 'close-support-task-modal') {
-    supportTaskModalId = null;
-    renderSupportAnalytics();
-  }
   if (action === 'select-support-customer') {
     selectedSupportCustomer = actionTarget.dataset.customerName;
     supportCustomerKeyword = selectedSupportCustomer;
-    supportTaskModalId = null;
     renderSupportAnalytics();
   }
   if (action === 'open-activity-cell') {
@@ -9455,6 +9814,7 @@ document.addEventListener('change', async (event) => {
 
 document.addEventListener('input', (event) => {
   if (event.target.id === 'task-keyword') {
+    taskListFilters.keyword = event.target.value;
     renderTaskManagement();
   }
   if (event.target.id === 'order-keyword') {
@@ -9498,7 +9858,35 @@ document.addEventListener('change', (event) => {
   if (event.target.id === 'edit-project-salesability') {
     toggleUnsellableReasonField('edit');
   }
-  if (['task-project-filter', 'task-status-filter', 'task-priority-filter', 'task-assignee-filter', 'task-category-filter'].includes(event.target.id)) {
+  if (event.target.id === 'task-project') {
+    taskFormState.project = event.target.value;
+    taskFormState.stage = projects.find((project) => project.externalName === taskFormState.project)?.stages[0]?.name || '';
+    renderTaskManagement();
+  }
+  if (event.target.id === 'task-stage') {
+    taskFormState.stage = event.target.value;
+  }
+  if (event.target.id === 'task-category') {
+    taskFormState.category = event.target.value;
+  }
+  if (event.target.id === 'task-project-filter') {
+    taskListFilters.project = event.target.value;
+    renderTaskManagement();
+  }
+  if (event.target.id === 'task-status-filter') {
+    taskListFilters.status = event.target.value;
+    renderTaskManagement();
+  }
+  if (event.target.id === 'task-priority-filter') {
+    taskListFilters.priority = event.target.value;
+    renderTaskManagement();
+  }
+  if (event.target.id === 'task-assignee-filter') {
+    taskListFilters.assignee = event.target.value;
+    renderTaskManagement();
+  }
+  if (event.target.id === 'task-category-filter') {
+    taskListFilters.category = event.target.value;
     renderTaskManagement();
   }
   if (event.target.id === 'analytics-period') {
@@ -9551,8 +9939,8 @@ document.addEventListener('change', (event) => {
 });
 
 function toggleLanguage() {
-  currentLanguage = currentLanguage === 'zh' ? 'en' : 'zh';
-  localStorage.setItem('kpm.language', currentLanguage);
+  currentLanguage = 'zh';
+  localStorage.setItem('kpm.language', 'zh');
   applyLanguage();
 }
 
@@ -9562,7 +9950,7 @@ loginLanguageToggle?.addEventListener('click', toggleLanguage);
 loginForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   if (!validateRequiredFields([
-    { id: 'login-account', label: '账号', valid: (value) => /^[A-Za-z0-9._%+@-]{3,128}$/.test(String(value).trim()), message: '账号长度 3-128 位，可以使用邮箱格式' },
+    { id: 'login-account', label: '登录邮箱', valid: requiredEmailValue, message: '登录账号必须是邮箱格式，例如 admin@kozenmobile.com' },
     { id: 'login-password', label: '密码', valid: (value) => textLengthBetween(value, 1, 128), message: '密码不能为空，且不能超过 128 个字符' },
   ], { title: '请检查登录信息' })) return;
   try {

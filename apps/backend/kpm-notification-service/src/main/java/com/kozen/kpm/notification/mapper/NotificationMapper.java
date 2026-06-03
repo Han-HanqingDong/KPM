@@ -46,8 +46,12 @@ public class NotificationMapper extends JdbcMapMapper {
         return jdbc.queryForObject("select count(*) from kpm_internal_messages where recipient_user_id=? and read_flag=false", Integer.class, userId);
     }
 
-    public void markRead(String id, String userId) {
-        update("update kpm_internal_messages set read_flag=true, read_at=current_timestamp where id=? and recipient_user_id=?", id, userId);
+    public int markRead(String id, String userId) {
+        return update("update kpm_internal_messages set read_flag=true, read_at=current_timestamp where id=? and recipient_user_id=?", id, userId);
+    }
+
+    public int markAllRead(String userId) {
+        return update("update kpm_internal_messages set read_flag=true, read_at=current_timestamp where recipient_user_id=? and read_flag=false", userId);
     }
 
     public List<Map<String, Object>> userByAccount(String account) {

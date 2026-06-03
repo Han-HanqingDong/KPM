@@ -5,18 +5,20 @@ import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSClientBuilder;
 import com.aliyun.oss.model.GeneratePresignedUrlRequest;
 import com.aliyun.oss.model.ObjectMetadata;
+import com.aliyun.oss.model.ResponseHeaderOverrides;
+import com.kozen.kpm.common.util.ValidationUtil;
 import com.kozen.kpm.file.config.OssProperties;
 import com.kozen.kpm.file.model.DownloadUrlResult;
 import com.kozen.kpm.file.model.FileUploadResult;
 import com.kozen.kpm.file.service.FileStorageService;
-import com.kozen.kpm.common.util.ValidationUtil;
-import org.springframework.cloud.context.config.annotation.RefreshScope;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -28,23 +30,23 @@ import java.util.Map;
 import java.util.UUID;
 
 @Service
-@RefreshScope
 public class AliyunOssFileStorageService implements FileStorageService {
     private static final DateTimeFormatter DATE_PATH_FORMATTER = DateTimeFormatter.ofPattern("yyyy/MM/dd");
     private static final DateTimeFormatter DATETIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    private final OssProperties ossProperties;
+    private final Environment environment;
 
-    public AliyunOssFileStorageService(OssProperties ossProperties) {
-        this.ossProperties = ossProperties;
+    public AliyunOssFileStorageService(Environment environment) {
+        this.environment = environment;
     }
 
     @Override
     public FileUploadResult upload(MultipartFile file, String category, String businessId, String uploader) throws IOException {
-        ensureReady();
+        OssProperties oss = currentOssProperties();
+        ensureReady(oss);
         validateUpload(file, category, businessId, uploader);
         String originalName = safeOriginalName(file.getOriginalFilename());
-        String objectKey = buildObjectKey(category, businessId, originalName);
+        String objectKey = buildObjectKey(oss, category, businessId, originalName);
         ObjectMetadata metadata = new ObjectMetadata();
         metadata.setContentLength(file.getSize());
         if (file.getContentType() != null && !file.getContentType().isBlank()) {
@@ -54,9 +56,9 @@ public class AliyunOssFileStorageService implements FileStorageService {
         metadata.addUserMetadata("category", normalizeCategory(category));
         metadata.addUserMetadata("uploader-b64", metadataValue(uploader == null || uploader.isBlank() ? "unknown" : uploader));
 
-        OSS ossClient = createClient();
+        OSS ossClient = createClient(oss);
         try {
-            ossClient.putObject(ossProperties.getBucket(), objectKey, file.getInputStream(), metadata);
+            ossClient.putObject(oss.getBucket(), objectKey, file.getInputStream(), metadata);
         } finally {
             ossClient.shutdown();
         }
@@ -72,29 +74,34 @@ public class AliyunOssFileStorageService implements FileStorageService {
                 file.getContentType() == null ? "application/octet-stream" : file.getContentType(),
                 uploader == null || uploader.isBlank() ? "张敏" : uploader,
                 normalizeCategory(category),
-                ossProperties.getBucket(),
+                oss.getBucket(),
                 objectKey,
-                "oss://" + ossProperties.getBucket() + "/" + objectKey,
+                "oss://" + oss.getBucket() + "/" + objectKey,
                 LocalDateTime.now().format(DATETIME_FORMATTER)
         );
     }
 
     @Override
-    public DownloadUrlResult createDownloadUrl(String objectKey) {
-        ensureReady();
+    public DownloadUrlResult createDownloadUrl(String objectKey, String fileName) {
+        OssProperties oss = currentOssProperties();
+        ensureReady(oss);
         if (objectKey == null || objectKey.isBlank()) {
             throw new IllegalArgumentException("objectKey is required");
         }
         ValidationUtil.optionalText(objectKey, "objectKey", 512);
-        long expiresInSeconds = Math.max(60, ossProperties.getDownloadUrlExpirationSeconds());
+        ValidationUtil.optionalText(fileName, "文件名", 255);
+        long expiresInSeconds = Math.max(60, oss.getDownloadUrlExpirationSeconds());
         Date expiration = new Date(System.currentTimeMillis() + expiresInSeconds * 1000);
-        GeneratePresignedUrlRequest request = new GeneratePresignedUrlRequest(ossProperties.getBucket(), objectKey, HttpMethod.GET);
+        GeneratePresignedUrlRequest request = new GeneratePresignedUrlRequest(oss.getBucket(), objectKey, HttpMethod.GET);
         request.setExpiration(expiration);
+        ResponseHeaderOverrides responseHeaders = new ResponseHeaderOverrides();
+        responseHeaders.setContentDisposition(contentDisposition(downloadFileName(objectKey, fileName)));
+        request.setResponseHeaders(responseHeaders);
 
-        OSS ossClient = createClient();
+        OSS ossClient = createClient(oss);
         try {
             URL signedUrl = ossClient.generatePresignedUrl(request);
-            return new DownloadUrlResult(ossProperties.getBucket(), objectKey, signedUrl.toString(), expiresInSeconds);
+            return new DownloadUrlResult(oss.getBucket(), objectKey, signedUrl.toString(), expiresInSeconds);
         } finally {
             ossClient.shutdown();
         }
@@ -102,30 +109,38 @@ public class AliyunOssFileStorageService implements FileStorageService {
 
     @Override
     public Map<String, Object> status() {
+        OssProperties oss = currentOssProperties();
         Map<String, Object> status = new LinkedHashMap<>();
-        status.put("enabled", ossProperties.isEnabled());
-        status.put("ready", ossProperties.ready());
-        status.put("endpoint", ossProperties.getEndpoint());
-        status.put("bucket", ossProperties.getBucket());
-        status.put("rootPrefix", ossProperties.normalizedRootPrefix());
-        status.put("accessKeyConfigured", ossProperties.getAccessKeyId() != null && !ossProperties.getAccessKeyId().isBlank()
-                && ossProperties.getAccessKeySecret() != null && !ossProperties.getAccessKeySecret().isBlank());
-        status.put("downloadUrlExpirationSeconds", ossProperties.getDownloadUrlExpirationSeconds());
+        status.put("enabled", oss.isEnabled());
+        status.put("ready", oss.ready());
+        status.put("endpoint", oss.getEndpoint());
+        status.put("bucket", oss.getBucket());
+        status.put("rootPrefix", oss.normalizedRootPrefix());
+        status.put("accessKeyConfigured", hasText(oss.getAccessKeyId()) && hasText(oss.getAccessKeySecret()));
+        status.put("downloadUrlExpirationSeconds", oss.getDownloadUrlExpirationSeconds());
         status.put("categories", categoryPaths());
         return status;
     }
 
-    private OSS createClient() {
-        return new OSSClientBuilder().build(
-                ossProperties.getEndpoint(),
-                ossProperties.getAccessKeyId(),
-                ossProperties.getAccessKeySecret()
-        );
+    private OssProperties currentOssProperties() {
+        OssProperties oss = new OssProperties();
+        oss.setEnabled(environment.getProperty("kpm.oss.enabled", Boolean.class, false));
+        oss.setEndpoint(environment.getProperty("kpm.oss.endpoint", ""));
+        oss.setBucket(environment.getProperty("kpm.oss.bucket", ""));
+        oss.setRootPrefix(environment.getProperty("kpm.oss.root-prefix", "KPM/"));
+        oss.setAccessKeyId(environment.getProperty("kpm.oss.access-key-id", ""));
+        oss.setAccessKeySecret(environment.getProperty("kpm.oss.access-key-secret", ""));
+        oss.setDownloadUrlExpirationSeconds(environment.getProperty("kpm.oss.download-url-expiration-seconds", Long.class, 900L));
+        return oss;
     }
 
-    private void ensureReady() {
-        if (!ossProperties.ready()) {
-            throw new IllegalStateException("OSS storage is not ready. Please configure kpm.oss in Nacos or environment variables.");
+    private OSS createClient(OssProperties oss) {
+        return new OSSClientBuilder().build(oss.getEndpoint(), oss.getAccessKeyId(), oss.getAccessKeySecret());
+    }
+
+    private void ensureReady(OssProperties oss) {
+        if (!oss.ready()) {
+            throw new IllegalStateException("OSS storage is not ready. Please set kpm.oss.enabled=true and configure endpoint, bucket, access-key-id and access-key-secret in Nacos.");
         }
     }
 
@@ -142,12 +157,16 @@ public class AliyunOssFileStorageService implements FileStorageService {
         ValidationUtil.optionalText(uploader, "上传人", 60);
     }
 
-    private String buildObjectKey(String category, String businessId, String originalName) {
+    private String buildObjectKey(OssProperties oss, String category, String businessId, String originalName) {
         String categoryPath = categoryPath(category);
         String businessSegment = safePathSegment(businessId == null || businessId.isBlank() ? "general" : businessId);
         String dateSegment = LocalDate.now().format(DATE_PATH_FORMATTER);
         String uniqueName = UUID.randomUUID() + "-" + safeOriginalName(originalName);
-        return ossProperties.normalizedRootPrefix() + categoryPath + "/" + businessSegment + "/" + dateSegment + "/" + uniqueName;
+        return oss.normalizedRootPrefix() + categoryPath + "/" + businessSegment + "/" + dateSegment + "/" + uniqueName;
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private static String normalizeCategory(String category) {
@@ -169,6 +188,18 @@ public class AliyunOssFileStorageService implements FileStorageService {
         paths.put("task-comment-attachments", "task/comment-attachments");
         paths.put("general", "general");
         return paths;
+    }
+
+    private static String downloadFileName(String objectKey, String fileName) {
+        String candidate = fileName == null || fileName.isBlank() ? objectKey.substring(objectKey.lastIndexOf('/') + 1) : fileName.trim();
+        return safeOriginalName(candidate);
+    }
+
+    private static String contentDisposition(String fileName) {
+        String asciiFallback = fileName.replaceAll("[^A-Za-z0-9._-]", "_");
+        if (asciiFallback.isBlank()) asciiFallback = "download";
+        String encoded = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20");
+        return "attachment; filename=\"" + asciiFallback + "\"; filename*=UTF-8''" + encoded;
     }
 
     private static String safeOriginalName(String fileName) {

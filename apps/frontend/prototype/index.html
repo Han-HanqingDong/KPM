@@ -16,7 +16,7 @@
         <div class="watcher"><span class="eye"></span><span class="eye"></span><i></i><b></b></div>
         <div class="watcher"><span class="eye"></span><span class="eye"></span><i></i><b></b></div>
       </div>
-      <button id="login-language-toggle" class="login-language-toggle" type="button" data-i18n="language">中文 / EN</button>
+      <button id="login-language-toggle" class="login-language-toggle hidden" type="button" data-i18n="language">中文 / EN</button>
       <div class="login-brand">
         <strong>KPM</strong>
         <span data-i18n="brand.subtitle">Kozen Project Management</span>
@@ -24,7 +24,7 @@
       <form id="login-form" class="login-form">
         <label>
           <span data-i18n="login.account">账号</span>
-          <input id="login-account" class="text-input" autocomplete="username" maxlength="64" value="zhangmin" data-i18n-placeholder="login.accountPlaceholder" placeholder="请输入账号" />
+          <input id="login-account" class="text-input" type="email" autocomplete="username" maxlength="128" value="admin@kozenmobile.com" data-i18n-placeholder="login.accountPlaceholder" placeholder="请输入登录邮箱" />
         </label>
         <label>
           <span data-i18n="login.password">密码</span>
@@ -33,7 +33,7 @@
         <p id="login-error" class="login-error"></p>
         <button class="primary-btn" type="submit" data-i18n="login.button">登录</button>
       </form>
-      <p class="login-hint" data-i18n="login.hint">演示账号：zhangmin / 123456</p>
+      <p class="login-hint" data-i18n="login.hint">管理员账号：admin@kozenmobile.com / 123456</p>
     </div>
   </section>
 
@@ -79,7 +79,7 @@
               <div id="notification-list" class="notification-list"><p class="empty-note">暂无未读消息</p></div>
             </div>
           </div>
-          <button id="language-toggle" class="ghost-btn">中文 / EN</button>
+          <button id="language-toggle" class="ghost-btn hidden">中文 / EN</button>
           <div class="user-menu">
             <button id="user-menu-trigger" class="user-chip">
               <span>张敏</span>
@@ -94,7 +94,7 @@
       </header>
 
       <section id="dashboard-view" class="view active">
-        <div class="summary-grid">
+        <div id="dashboard-summary" class="summary-grid">
           <article class="summary-card">
             <span>进行中项目</span>
             <strong>12</strong>
@@ -112,10 +112,10 @@
         <div class="panel">
           <div class="panel-head">
             <div>
-              <h2>我的项目</h2>
-              <p>优先查看你参与的产品型号</p>
+              <h2 data-i18n="dashboard.myProjects">我的项目</h2>
+              <p data-i18n="dashboard.myProjectsHint">优先查看你参与的产品型号</p>
             </div>
-            <button class="ghost-btn" data-view="projects">查看全部</button>
+            <button class="ghost-btn" data-view="projects" data-i18n="dashboard.viewAllProjects">查看全部</button>
           </div>
           <div id="my-projects" class="project-list"></div>
         </div>
@@ -193,7 +193,7 @@
       </section>
 
       <section id="project-detail-view" class="view">
-        <button class="back-link" data-view="projects">← 返回项目列表</button>
+        <button id="project-detail-back" class="back-link" data-action="back-from-project-detail">← 返回项目列表</button>
         <div id="project-detail"></div>
       </section>
 

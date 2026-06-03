@@ -17,7 +17,7 @@ public interface FileStorageService {
     FileUploadResult upload(MultipartFile file, String category, String businessId, String uploader) throws IOException;
 
     /** Generate a short-lived download URL for an existing OSS object key. */
-    DownloadUrlResult createDownloadUrl(String objectKey);
+    DownloadUrlResult createDownloadUrl(String objectKey, String fileName);
 
     /** Return a safe status view without exposing access secrets. */
     Map<String, Object> status();

@@ -51,8 +51,9 @@
         if (payload && payload.success === false) throw new Error(payload.message || payload.code || 'OSS upload failed');
         return payload && Object.prototype.hasOwnProperty.call(payload, 'data') ? payload.data : payload;
       },
-      async downloadUrl(objectKey) {
+      async downloadUrl(objectKey, fileName = '') {
         const query = new URLSearchParams({ objectKey });
+        if (fileName) query.set('fileName', fileName);
         return this.get(`/api/files/download-url?${query.toString()}`);
       },
     };

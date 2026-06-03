@@ -1,6 +1,8 @@
 package com.kozen.kpm.gateway.security;
 
 import com.kozen.kpm.common.auth.AuthTokenUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
@@ -11,13 +13,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Mono;
 
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
-import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Gateway-level bearer token and RBAC verification.
@@ -27,6 +30,8 @@ import java.util.Map;
  */
 @Component
 public class BearerTokenGatewayFilter implements GlobalFilter, Ordered {
+    private static final Logger log = LoggerFactory.getLogger(BearerTokenGatewayFilter.class);
+
     private final boolean enabled;
     private final boolean rbacEnabled;
     private final String tokenSecret;
@@ -77,10 +82,10 @@ public class BearerTokenGatewayFilter implements GlobalFilter, Ordered {
             return chain.filter(forwarded);
         }
 
-        return permissions(account)
-                .flatMap(permissions -> permissions.contains(requiredPermission)
+        return permissionCodes(account)
+                .flatMap(permissions -> hasPermission(permissions, requiredPermission)
                         ? chain.filter(forwarded)
-                        : forbidden(exchange, "当前账号没有操作权限：" + requiredPermission))
+                        : rejectMissingPermission(exchange, account, requiredPermission, permissions))
                 .onErrorResume(error -> forbidden(exchange, "权限服务不可用，请稍后重试"));
     }
 
@@ -98,26 +103,57 @@ public class BearerTokenGatewayFilter implements GlobalFilter, Ordered {
                 || path.startsWith("/swagger-ui");
     }
 
-    private Mono<List<String>> permissions(String account) {
-        String encoded = URLEncoder.encode(account, StandardCharsets.UTF_8);
+    private Mono<Set<String>> permissionCodes(String account) {
         return webClient.get()
-                .uri(iamUri + "/api/iam/me?account=" + encoded)
+                .uri(UriComponentsBuilder
+                        .fromUriString(iamUri)
+                        .path("/api/iam/me")
+                        .queryParam("account", account)
+                        .build()
+                        .toUri())
                 .retrieve()
                 .bodyToMono(Map.class)
                 .map(this::extractPermissions);
     }
 
     @SuppressWarnings("unchecked")
-    private List<String> extractPermissions(Map<?, ?> response) {
+    private Set<String> extractPermissions(Map<?, ?> response) {
         Object data = response.get("data");
         if (!(data instanceof Map<?, ?> user)) {
-            return List.of();
+            return Set.of();
         }
         Object rawPermissions = user.get("permissions");
         if (!(rawPermissions instanceof Collection<?> collection)) {
-            return List.of();
+            return Set.of();
         }
-        return collection.stream().map(String::valueOf).toList();
+        Set<String> permissions = new LinkedHashSet<>();
+        for (Object permission : collection) {
+            if (permission == null) continue;
+            String code = String.valueOf(permission).trim();
+            if (!code.isBlank()) {
+                permissions.add(code);
+            }
+        }
+        return permissions;
+    }
+
+    private boolean hasPermission(Set<String> permissions, String requiredPermission) {
+        return permissions.contains("*") || permissions.contains(requiredPermission);
+    }
+
+    private Mono<Void> rejectMissingPermission(
+            ServerWebExchange exchange,
+            String account,
+            String requiredPermission,
+            Set<String> permissions
+    ) {
+        log.warn(
+                "Permission denied. account={}, requiredPermission={}, permissionCount={}",
+                account,
+                requiredPermission,
+                permissions.size()
+        );
+        return forbidden(exchange, "当前账号没有操作权限：" + requiredPermission);
     }
 
     private String requiredPermission(String path, HttpMethod method) {

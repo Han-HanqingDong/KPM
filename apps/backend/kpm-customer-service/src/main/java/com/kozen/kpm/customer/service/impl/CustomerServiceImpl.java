@@ -1,15 +1,17 @@
 package com.kozen.kpm.customer.service.impl;
 
+import com.kozen.kpm.common.dto.FileMetadataRequest;
 import com.kozen.kpm.common.util.IdUtil;
 import com.kozen.kpm.common.util.SqlParamUtil;
-import com.kozen.kpm.common.util.ValidationUtil;
 import com.kozen.kpm.customer.converter.CustomerContactConverter;
+import com.kozen.kpm.customer.dto.CustomerContactRequest;
+import com.kozen.kpm.customer.dto.CustomerFollowupRequest;
+import com.kozen.kpm.customer.dto.CustomerRequest;
 import com.kozen.kpm.customer.mapper.CustomerMapper;
 import com.kozen.kpm.customer.service.CustomerService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -40,20 +42,18 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     @Transactional
-    public Map<String, Object> create(Map<String, Object> body) {
-        validateCustomer(body);
-        String id = uniqueCustomerId(String.valueOf(body.getOrDefault("name", "customer")));
-        customerMapper.insert(id, body);
-        replaceOwners(id, body);
+    public Map<String, Object> create(CustomerRequest request) {
+        String id = uniqueCustomerId(request.name());
+        customerMapper.insert(id, request.toMap());
+        replaceOwners(id, request);
         return detail(id);
     }
 
     @Override
     @Transactional
-    public Map<String, Object> update(String id, Map<String, Object> body) {
-        validateCustomer(body);
-        customerMapper.updateCustomer(id, body);
-        replaceOwners(id, body);
+    public Map<String, Object> update(String id, CustomerRequest request) {
+        customerMapper.updateCustomer(id, request.toMap());
+        replaceOwners(id, request);
         return detail(id);
     }
 
@@ -65,9 +65,8 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     @Transactional
-    public Map<String, Object> addContact(String id, Map<String, Object> body) {
-        validateContact(body);
-        customerMapper.insertContact(IdUtil.nanoId("cc"), id, body);
+    public Map<String, Object> addContact(String id, CustomerContactRequest request) {
+        customerMapper.insertContact(IdUtil.nanoId("cc"), id, request.toMap());
         return detail(id);
     }
 
@@ -80,38 +79,22 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     @Transactional
-    public Map<String, Object> addFollowup(String id, Map<String, Object> body) {
-        ValidationUtil.requireText(body, "content", "跟进内容", 2000);
-        ValidationUtil.optionalJsonArrayLike(body, "attachments", "跟进附件", 20);
-        customerMapper.insertFollowup(IdUtil.nanoId("cf"), id, body.getOrDefault("author", "张敏"), body.get("content"), body.get("attachments"));
+    public Map<String, Object> addFollowup(String id, CustomerFollowupRequest request) {
+        boolean hasText = request.content() != null && !request.content().isBlank();
+        boolean hasFiles = request.attachments() != null && !request.attachments().isEmpty();
+        if (!hasText && !hasFiles) {
+            throw new IllegalArgumentException("跟进记录内容或附件不能为空");
+        }
+        String author = request.author() == null || request.author().isBlank() ? "张敏" : request.author();
+        customerMapper.insertFollowup(IdUtil.nanoId("cf"), id, author, request.content(), request.safeAttachments());
         return detail(id);
     }
 
     @Override
     @Transactional
-    public Map<String, Object> addMaterial(String id, Map<String, Object> body) {
-        ValidationUtil.validateFileMeta(body);
-        customerMapper.insertMaterial(IdUtil.nanoId("cm"), id, body);
+    public Map<String, Object> addMaterial(String id, FileMetadataRequest request) {
+        customerMapper.insertMaterial(IdUtil.nanoId("cm"), id, request.toMap());
         return detail(id);
-    }
-
-    private void validateCustomer(Map<String, Object> body) {
-        ValidationUtil.requireText(body, "name", "客户名称", 120);
-        ValidationUtil.optionalText(body, "shortName", "客户简称", 60);
-        ValidationUtil.requireText(body, "region", "国家 / 区域", 80);
-        ValidationUtil.optionalText(body, "address", "详细地址", 255);
-        ValidationUtil.optionalText(body, "level", "客户等级", 60);
-        ValidationUtil.optionalText(body, "status", "客户状态", 60);
-        ValidationUtil.maxList(body, "salesOwners", "负责销售", 30);
-        ValidationUtil.maxList(body, "supportOwners", "负责技术支持", 30);
-    }
-
-    private void validateContact(Map<String, Object> body) {
-        ValidationUtil.requireText(body, "name", "联系人姓名", 60);
-        ValidationUtil.optionalText(body, "title", "联系人职位", 80);
-        ValidationUtil.optionalPhone(body, "phone", "联系人电话");
-        ValidationUtil.optionalEmail(body, "email", "联系人邮箱");
-        ValidationUtil.optionalText(body, "remark", "联系人备注", 500);
     }
 
     private void enrichCustomer(Map<String, Object> customer) {
@@ -124,14 +107,13 @@ public class CustomerServiceImpl implements CustomerService {
         customer.put("projects", customerMapper.projects(id));
     }
 
-    @SuppressWarnings("unchecked")
-    private void replaceOwners(String customerId, Map<String, Object> body) {
+    private void replaceOwners(String customerId, CustomerRequest request) {
         customerMapper.deleteOwners(customerId);
-        for (Object owner : (List<Object>) body.getOrDefault("salesOwners", List.of())) {
+        for (String owner : request.safeSalesOwners()) {
             Map<String, Object> user = requireUser(owner, "负责销售");
             customerMapper.insertOwner(IdUtil.nanoId("co"), customerId, "sales", String.valueOf(user.get("id")), user.get("name"));
         }
-        for (Object owner : (List<Object>) body.getOrDefault("supportOwners", List.of())) {
+        for (String owner : request.safeSupportOwners()) {
             Map<String, Object> user = requireUser(owner, "负责技术支持");
             customerMapper.insertOwner(IdUtil.nanoId("co"), customerId, "support", String.valueOf(user.get("id")), user.get("name"));
         }

@@ -1,5 +1,7 @@
 package com.kozen.kpm.order.service;
 
+import com.kozen.kpm.order.dto.OrderRequest;
+
 import java.util.List;
 import java.util.Map;
 
@@ -22,12 +24,12 @@ public interface OrderService {
     /**
      * Create a new order and update related customer-project status.
      */
-    Map<String, Object> create(Map<String, Object> body);
+    Map<String, Object> create(OrderRequest request);
 
     /**
      * Update an existing order and append an audit history record.
      */
-    Map<String, Object> update(String id, Map<String, Object> body);
+    Map<String, Object> update(String id, OrderRequest request);
 
     /**
      * Delete one order by ID.

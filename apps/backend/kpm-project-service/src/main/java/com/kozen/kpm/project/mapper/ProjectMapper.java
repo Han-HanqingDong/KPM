@@ -77,7 +77,7 @@ public class ProjectMapper extends JdbcMapMapper {
     }
 
     public List<Map<String, Object>> usersByAccountOrName(Object value) {
-        return rows("select id, account, name from kpm_users where account=? or name=?", value, value);
+        return rows("select id, account, email, name from kpm_users where account=? or email=? or name=?", value, value, value);
     }
 
     public Map<String, Object> userById(Object id) {

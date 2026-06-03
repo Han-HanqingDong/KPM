@@ -1,5 +1,10 @@
 package com.kozen.kpm.customer.service;
 
+import com.kozen.kpm.common.dto.FileMetadataRequest;
+import com.kozen.kpm.customer.dto.CustomerContactRequest;
+import com.kozen.kpm.customer.dto.CustomerFollowupRequest;
+import com.kozen.kpm.customer.dto.CustomerRequest;
+
 import java.util.List;
 import java.util.Map;
 
@@ -22,12 +27,12 @@ public interface CustomerService {
     /**
      * Create one customer and bind sales/support owners.
      */
-    Map<String, Object> create(Map<String, Object> body);
+    Map<String, Object> create(CustomerRequest request);
 
     /**
      * Update customer base fields and owner bindings.
      */
-    Map<String, Object> update(String id, Map<String, Object> body);
+    Map<String, Object> update(String id, CustomerRequest request);
 
     /**
      * Delete one customer by ID.
@@ -37,7 +42,7 @@ public interface CustomerService {
     /**
      * Add one contact to the customer.
      */
-    Map<String, Object> addContact(String id, Map<String, Object> body);
+    Map<String, Object> addContact(String id, CustomerContactRequest request);
 
     /**
      * Delete one contact from the customer.
@@ -47,10 +52,10 @@ public interface CustomerService {
     /**
      * Add one follow-up record to the customer.
      */
-    Map<String, Object> addFollowup(String id, Map<String, Object> body);
+    Map<String, Object> addFollowup(String id, CustomerFollowupRequest request);
 
     /**
      * Add one uploaded material metadata record to the customer.
      */
-    Map<String, Object> addMaterial(String id, Map<String, Object> body);
+    Map<String, Object> addMaterial(String id, FileMetadataRequest request);
 }

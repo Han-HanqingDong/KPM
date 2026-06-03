@@ -4,6 +4,7 @@ import com.kozen.kpm.common.util.IdUtil;
 import com.kozen.kpm.common.util.JsonUtil;
 import com.kozen.kpm.common.util.SqlParamUtil;
 import com.kozen.kpm.common.util.ValidationUtil;
+import com.kozen.kpm.order.dto.OrderRequest;
 import com.kozen.kpm.order.mapper.OrderMapper;
 import com.kozen.kpm.order.service.OrderService;
 import org.springframework.stereotype.Service;
@@ -43,32 +44,33 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
-    public Map<String, Object> create(Map<String, Object> body) {
-        validateOrder(body, false);
-        String id = body.get("id") == null || String.valueOf(body.get("id")).isBlank() ? nextOrderId() : String.valueOf(body.get("id"));
-        BigDecimal unitPrice = ValidationUtil.nonNegativeDecimal(body, "unitPrice", "单价");
-        int quantity = ValidationUtil.positiveInt(body, "quantity", "数量", 10_000_000);
+    public Map<String, Object> create(OrderRequest request) {
+        Map<String, Object> body = request.toMap();
+        String id = request.id() == null || request.id().isBlank() ? nextOrderId() : request.id();
+        BigDecimal unitPrice = request.unitPrice();
+        int quantity = request.quantity();
         BigDecimal amount = unitPrice.multiply(BigDecimal.valueOf(quantity));
-        Map<String, Object> creator = requireUser(body.getOrDefault("creator", "张敏"), "订单创建人");
+        Map<String, Object> creator = requireUser(request.creator(), "订单创建人");
         orderMapper.insert(body, id, quantity, unitPrice, amount, String.valueOf(creator.get("id")), String.valueOf(creator.get("name")));
-        ensureProjectCustomer(String.valueOf(body.get("projectId")), String.valueOf(body.get("customerId")), String.valueOf(body.getOrDefault("orderType", "正式订单")));
-        publishOrderCreatedEvent(id, body);
+        ensureProjectCustomer(request.projectId(), request.customerId(), request.safeOrderType());
+        publishOrderCreatedEvent(id, request);
         return detail(id);
     }
 
     @Override
     @Transactional
-    public Map<String, Object> update(String id, Map<String, Object> body) {
-        validateOrder(body, true);
+    public Map<String, Object> update(String id, OrderRequest request) {
+        Map<String, Object> body = request.toMap();
         Map<String, Object> before = detail(id);
-        BigDecimal unitPrice = ValidationUtil.nonNegativeDecimal(body, "unitPrice", "单价");
-        int quantity = ValidationUtil.positiveInt(body, "quantity", "数量", 10_000_000);
+        BigDecimal unitPrice = request.unitPrice();
+        int quantity = request.quantity();
         BigDecimal amount = unitPrice.multiply(BigDecimal.valueOf(quantity));
         orderMapper.updateOrder(id, body, quantity, unitPrice, amount);
-        String changes = String.valueOf(body.getOrDefault("changeSummary", summarize(before, body)));
-        String reason = ValidationUtil.requireText(body, "changeReason", "修改原因", 500);
-        orderMapper.insertHistory(IdUtil.nanoId("oh"), id, body.getOrDefault("modifier", "张敏"), changes, reason);
-        ensureProjectCustomer(String.valueOf(body.get("projectId")), String.valueOf(body.get("customerId")), String.valueOf(body.getOrDefault("orderType", "正式订单")));
+        String changes = request.changeSummary() == null || request.changeSummary().isBlank() ? summarize(before, body) : request.changeSummary();
+        String reason = ValidationUtil.requireText(request.changeReason(), "修改原因", 500);
+        String modifier = request.modifier() == null || request.modifier().isBlank() ? "张敏" : request.modifier();
+        orderMapper.insertHistory(IdUtil.nanoId("oh"), id, modifier, changes, reason);
+        ensureProjectCustomer(request.projectId(), request.customerId(), request.safeOrderType());
         return detail(id);
     }
 
@@ -89,8 +91,8 @@ public class OrderServiceImpl implements OrderService {
         return users.getFirst();
     }
 
-    private void publishOrderCreatedEvent(String orderId, Map<String, Object> body) {
-        List<String> recipients = orderMapper.customerOwnerUserIds(String.valueOf(body.get("customerId")));
+    private void publishOrderCreatedEvent(String orderId, OrderRequest request) {
+        List<String> recipients = orderMapper.customerOwnerUserIds(request.customerId());
         if (recipients.isEmpty()) {
             return;
         }
@@ -124,26 +126,6 @@ public class OrderServiceImpl implements OrderService {
 
     private String summarize(Map<String, Object> before, Map<String, Object> after) {
         return "订单更新：" + before.get("quantity") + "台 → " + after.get("quantity") + "台；计划发货 " + before.get("plannedShipDate") + " → " + after.get("plannedShipDate");
-    }
-
-    private void validateOrder(Map<String, Object> body, boolean update) {
-        ValidationUtil.requireDate(body, "orderDate", "下单日期");
-        ValidationUtil.requireText(body, "customerId", "客户ID", 80);
-        ValidationUtil.requireText(body, "projectId", "项目ID", 80);
-        ValidationUtil.requireText(body, "orderType", "订单类型", 40);
-        ValidationUtil.positiveInt(body, "quantity", "数量", 10_000_000);
-        ValidationUtil.requireText(body, "specification", "具体规格", 1000);
-        ValidationUtil.optionalDate(body, "expectedShipDate", "期望发货日期");
-        ValidationUtil.optionalDate(body, "plannedShipDate", "计划发货日期");
-        ValidationUtil.optionalText(body, "softwareVersion", "软件版本号", 80);
-        ValidationUtil.requireText(body, "currency", "币种", 10);
-        ValidationUtil.nonNegativeDecimal(body, "unitPrice", "单价");
-        ValidationUtil.requireText(body, "creator", "创建人", 60);
-        if (update) {
-            ValidationUtil.optionalText(body, "modifier", "修改人", 60);
-            ValidationUtil.requireText(body, "changeReason", "修改原因", 500);
-            ValidationUtil.optionalText(body, "changeSummary", "修改内容", 1000);
-        }
     }
 
     private String nextOrderId() {

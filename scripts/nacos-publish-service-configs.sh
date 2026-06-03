@@ -22,6 +22,56 @@ publish() {
   echo "Published ${data_id} to namespace=${NAMESPACE}, group=${GROUP}"
 }
 
+fetch_config() {
+  local data_id="$1"
+  curl -fsS -G "http://${NACOS_ADDR}/nacos/v1/cs/configs" \
+    --data-urlencode "tenant=${NAMESPACE}" \
+    --data-urlencode "group=${GROUP}" \
+    --data-urlencode "dataId=${data_id}" 2>/dev/null || true
+}
+
+extract_oss_block() {
+  awk '
+    /^  oss:/ { in_oss=1 }
+    in_oss && /^  [A-Za-z0-9_-]+:/ && !/^  oss:/ { exit }
+    in_oss { print }
+  '
+}
+
+file_oss_config_block() {
+  if [[ -n "${KPM_OSS_ACCESS_KEY_ID:-}" && -n "${KPM_OSS_ACCESS_KEY_SECRET:-}" ]]; then
+    cat <<YAML
+  oss:
+    enabled: ${KPM_OSS_ENABLED:-true}
+    endpoint: ${KPM_OSS_ENDPOINT:-https://oss-cn-shanghai.aliyuncs.com}
+    bucket: ${KPM_OSS_BUCKET:-xc-kozen-sh-fw}
+    root-prefix: ${KPM_OSS_ROOT_PREFIX:-KPM/}
+    access-key-id: ${KPM_OSS_ACCESS_KEY_ID}
+    access-key-secret: ${KPM_OSS_ACCESS_KEY_SECRET}
+    download-url-expiration-seconds: ${KPM_OSS_DOWNLOAD_URL_EXPIRE_SECONDS:-900}
+YAML
+    return
+  fi
+
+  local existing_oss
+  existing_oss="$(fetch_config kpm-file-service.yaml | extract_oss_block)"
+  if [[ -n "${existing_oss}" && "${existing_oss}" == *"access-key-id:"* && "${existing_oss}" == *"access-key-secret:"* ]]; then
+    printf '%s\n' "${existing_oss}"
+    return
+  fi
+
+  cat <<YAML
+  oss:
+    enabled: ${KPM_OSS_ENABLED:-false}
+    endpoint: ${KPM_OSS_ENDPOINT:-https://oss-cn-shanghai.aliyuncs.com}
+    bucket: ${KPM_OSS_BUCKET:-xc-kozen-sh-fw}
+    root-prefix: ${KPM_OSS_ROOT_PREFIX:-KPM/}
+    access-key-id: ${KPM_OSS_ACCESS_KEY_ID:-}
+    access-key-secret: ${KPM_OSS_ACCESS_KEY_SECRET:-}
+    download-url-expiration-seconds: ${KPM_OSS_DOWNLOAD_URL_EXPIRE_SECONDS:-900}
+YAML
+}
+
 base_config() {
   local port="$1"
   local code="$2"
@@ -66,14 +116,7 @@ kpm:
     code: file
   auth:
     token-secret: ${AUTH_SECRET}
-  oss:
-    enabled: ${KPM_OSS_ENABLED:-false}
-    endpoint: ${KPM_OSS_ENDPOINT:-https://oss-cn-shanghai.aliyuncs.com}
-    bucket: ${KPM_OSS_BUCKET:-xc-kozen-sh-fw}
-    root-prefix: ${KPM_OSS_ROOT_PREFIX:-KPM/}
-    access-key-id: ${KPM_OSS_ACCESS_KEY_ID:-}
-    access-key-secret: ${KPM_OSS_ACCESS_KEY_SECRET:-}
-    download-url-expiration-seconds: ${KPM_OSS_DOWNLOAD_URL_EXPIRE_SECONDS:-900}
+$(file_oss_config_block)
 YAML
 )"
 

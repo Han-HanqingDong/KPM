@@ -5,11 +5,11 @@ INSERT INTO kpm_departments (id, name) VALUES
 ('dept-sales','销售部'),('dept-ops','运营部'),('dept-test','测试部'),('dept-workshop','车间');
 
 INSERT INTO kpm_users (id, account, email, name, password_hash) VALUES
-('user-zhangmin','zhangmin','zhangmin@kozen.example','张敏','{noop}123456'),('user-wangwei','wangwei','wangwei@kozen.example','王伟','{noop}123456'),
-('user-lina','lina','lina@kozen.example','李娜','{noop}123456'),('user-chenchen','chenchen','chenchen@kozen.example','陈晨','{noop}123456'),
-('user-zhaolei','zhaolei','zhaolei@kozen.example','赵磊','{noop}123456'),('user-gaojing','gaojing','gaojing@kozen.example','高静','{noop}123456'),
-('user-zhouhang','zhouhang','zhouhang@kozen.example','周航','{noop}123456'),('user-sunqian','sunqian','sunqian@kozen.example','孙倩','{noop}123456'),
-('user-liuyang','liuyang','liuyang@kozen.example','刘洋','{noop}123456'),('user-hejing','hejing','hejing@kozen.example','何静','{noop}123456'),('user-wuyue','wuyue','wuyue@kozen.example','吴越','{noop}123456');
+('user-zhangmin','admin@kozenmobile.com','admin@kozenmobile.com','张敏','{noop}123456'),('user-wangwei','wangwei@kozenmobile.com','wangwei@kozenmobile.com','王伟','{noop}123456'),
+('user-lina','lina@kozenmobile.com','lina@kozenmobile.com','李娜','{noop}123456'),('user-chenchen','chenchen@kozenmobile.com','chenchen@kozenmobile.com','陈晨','{noop}123456'),
+('user-zhaolei','zhaolei@kozenmobile.com','zhaolei@kozenmobile.com','赵磊','{noop}123456'),('user-gaojing','gaojing@kozenmobile.com','gaojing@kozenmobile.com','高静','{noop}123456'),
+('user-zhouhang','zhouhang@kozenmobile.com','zhouhang@kozenmobile.com','周航','{noop}123456'),('user-sunqian','sunqian@kozenmobile.com','sunqian@kozenmobile.com','孙倩','{noop}123456'),
+('user-liuyang','liuyang@kozenmobile.com','liuyang@kozenmobile.com','刘洋','{noop}123456'),('user-hejing','hejing@kozenmobile.com','hejing@kozenmobile.com','何静','{noop}123456'),('user-wuyue','wuyue@kozenmobile.com','wuyue@kozenmobile.com','吴越','{noop}123456');
 
 INSERT INTO kpm_user_departments (user_id, department_id) VALUES
 ('user-zhangmin','dept-product'),('user-zhangmin','dept-ops'),('user-wangwei','dept-hardware'),('user-wangwei','dept-product'),
@@ -148,16 +148,16 @@ INSERT INTO kpm_template_stages (id, template_id, stage_name, sort_order) VALUES
 ('tpl-overseas-1','tpl-overseas-custom','提出想法',1),('tpl-overseas-2','tpl-overseas-custom','讨论可行性',2),('tpl-overseas-3','tpl-overseas-custom','硬件设计',3),('tpl-overseas-4','tpl-overseas-custom','软件适配',4),('tpl-overseas-5','tpl-overseas-custom','客户调试',5),('tpl-overseas-6','tpl-overseas-custom','客户下单',6);
 
 INSERT INTO kpm_projects (id, external_name, internal_name, model_name, manager_user_id, manager_account, status, archived, salesability, unsellable_reason, description) VALUES
-('p8-dual','P8 dual','R2351','K1352','user-wangwei','wangwei','进行中',false,'不可销售','仍处于设计或测试阶段','面向海外市场的双屏 POS 设备。'),
-('s6-mini','S6 mini','R2290','K1290','user-zhouhang','zhouhang','进行中',false,'不可销售','仍处于设计或测试阶段','轻量级移动收银终端。'),
-('x10-pro','X10 Pro','R2410','K1410','user-liuyang','liuyang','已完成',true,'不可销售','产品过老，不再继续推广','高端桌面式 POS 设备。'),
-('m5-plus','M5 Plus','R2510','K1510','user-hejing','hejing','进行中',false,'可销售',NULL,'已完成设计测试并进入客户推广的移动 POS。');
+('p8-dual','P8 dual','R2351','K1352','user-wangwei','wangwei@kozenmobile.com','进行中',false,'不可销售','仍处于设计或测试阶段','面向海外市场的双屏 POS 设备。'),
+('s6-mini','S6 mini','R2290','K1290','user-zhouhang','zhouhang@kozenmobile.com','进行中',false,'不可销售','仍处于设计或测试阶段','轻量级移动收银终端。'),
+('x10-pro','X10 Pro','R2410','K1410','user-liuyang','liuyang@kozenmobile.com','已完成',true,'不可销售','产品过老，不再继续推广','高端桌面式 POS 设备。'),
+('m5-plus','M5 Plus','R2510','K1510','user-hejing','hejing@kozenmobile.com','进行中',false,'可销售',NULL,'已完成设计测试并进入客户推广的移动 POS。');
 
 INSERT INTO kpm_project_members (id, project_id, user_id, user_account, role_name) VALUES
-('pm-p8-1','p8-dual','user-wangwei','wangwei','硬件项目经理'),('pm-p8-2','p8-dual','user-lina','lina','软件项目经理'),('pm-p8-3','p8-dual','user-chenchen','chenchen','技术支持'),('pm-p8-4','p8-dual','user-zhaolei','zhaolei','销售'),
-('pm-s6-1','s6-mini','user-zhouhang','zhouhang','硬件项目经理'),('pm-s6-2','s6-mini','user-sunqian','sunqian','软件项目经理'),
-('pm-x10-1','x10-pro','user-liuyang','liuyang','硬件项目经理'),('pm-x10-2','x10-pro','user-gaojing','gaojing','销售'),
-('pm-m5-1','m5-plus','user-hejing','hejing','硬件项目经理'),('pm-m5-2','m5-plus','user-wuyue','wuyue','销售');
+('pm-p8-1','p8-dual','user-wangwei','wangwei@kozenmobile.com','硬件项目经理'),('pm-p8-2','p8-dual','user-lina','lina@kozenmobile.com','软件项目经理'),('pm-p8-3','p8-dual','user-chenchen','chenchen@kozenmobile.com','技术支持'),('pm-p8-4','p8-dual','user-zhaolei','zhaolei@kozenmobile.com','销售'),
+('pm-s6-1','s6-mini','user-zhouhang','zhouhang@kozenmobile.com','硬件项目经理'),('pm-s6-2','s6-mini','user-sunqian','sunqian@kozenmobile.com','软件项目经理'),
+('pm-x10-1','x10-pro','user-liuyang','liuyang@kozenmobile.com','硬件项目经理'),('pm-x10-2','x10-pro','user-gaojing','gaojing@kozenmobile.com','销售'),
+('pm-m5-1','m5-plus','user-hejing','hejing@kozenmobile.com','硬件项目经理'),('pm-m5-2','m5-plus','user-wuyue','wuyue@kozenmobile.com','销售');
 
 INSERT INTO kpm_project_stages (id, project_id, stage_name, stage_order, status) VALUES
 ('st-p8-1','p8-dual','提出想法',1,'已完成'),('st-p8-2','p8-dual','讨论可行性',2,'已完成'),('st-p8-3','p8-dual','核算成本',3,'已完成'),('st-p8-4','p8-dual','硬件设计',4,'已完成'),('st-p8-5','p8-dual','软件适配',5,'进行中'),('st-p8-6','p8-dual','测试生产',6,'未开始'),('st-p8-7','p8-dual','试用',7,'未开始'),('st-p8-8','p8-dual','客户推广',8,'未开始'),
@@ -166,7 +166,7 @@ INSERT INTO kpm_project_stages (id, project_id, stage_name, stage_order, status)
 ('st-m5-1','m5-plus','硬件设计',1,'已完成'),('st-m5-2','m5-plus','软件适配',2,'已完成'),('st-m5-3','m5-plus','测试生产',3,'已完成'),('st-m5-4','m5-plus','客户推广',4,'进行中');
 
 INSERT INTO kpm_stage_assignees (id, stage_id, assignee_type, assignee_name, account, user_id) VALUES
-('sa-p8-1-1','st-p8-1','department','销售部',NULL,NULL),('sa-p8-1-2','st-p8-1','department','产品部',NULL,NULL),('sa-p8-4-1','st-p8-4','user','王伟','wangwei','user-wangwei'),('sa-p8-5-1','st-p8-5','user','李娜','lina','user-lina'),('sa-p8-8-1','st-p8-8','department','销售部',NULL,NULL),('sa-p8-8-2','st-p8-8','department','技术支持部',NULL,NULL),
+('sa-p8-1-1','st-p8-1','department','销售部',NULL,NULL),('sa-p8-1-2','st-p8-1','department','产品部',NULL,NULL),('sa-p8-4-1','st-p8-4','user','王伟','wangwei@kozenmobile.com','user-wangwei'),('sa-p8-5-1','st-p8-5','user','李娜','lina@kozenmobile.com','user-lina'),('sa-p8-8-1','st-p8-8','department','销售部',NULL,NULL),('sa-p8-8-2','st-p8-8','department','技术支持部',NULL,NULL),
 ('sa-s6-3-1','st-s6-3','department','运营部',NULL,NULL),('sa-m5-4-1','st-m5-4','department','销售部',NULL,NULL);
 
 INSERT INTO kpm_stage_materials (id, stage_id, file_name, file_type, file_size, uploader, uploaded_at, published_to_project) VALUES
