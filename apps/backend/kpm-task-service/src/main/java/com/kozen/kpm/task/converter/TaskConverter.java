@@ -17,7 +17,9 @@ public class TaskConverter {
     public TaskDto toTaskDto(
             TaskEntity task,
             List<String> assignees,
+            List<String> assigneeIds,
             List<String> participants,
+            List<String> participantIds,
             List<TaskAttachmentEntity> attachments,
             List<TaskCommentEntity> comments
     ) {
@@ -44,7 +46,9 @@ public class TaskConverter {
                 task.getCreatedAt(),
                 task.getUpdatedAt(),
                 List.copyOf(assignees),
+                List.copyOf(assigneeIds),
                 List.copyOf(participants),
+                List.copyOf(participantIds),
                 attachments.stream().map(this::toAttachmentDto).toList(),
                 comments.stream().map(this::toCommentDto).toList()
         );

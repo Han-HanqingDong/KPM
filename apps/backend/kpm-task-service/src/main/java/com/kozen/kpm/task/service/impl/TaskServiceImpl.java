@@ -133,7 +133,9 @@ public class TaskServiceImpl implements TaskService {
         return taskConverter.toTaskDto(
                 task,
                 taskMapper.assignees(id),
+                taskMapper.assigneeIds(id),
                 taskMapper.participants(id),
+                taskMapper.participantIds(id),
                 taskMapper.attachments(id),
                 taskMapper.comments(id)
         );

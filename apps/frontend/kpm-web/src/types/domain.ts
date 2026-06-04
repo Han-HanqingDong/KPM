@@ -113,8 +113,11 @@ export type Task = {
   dueDate?: string;
   source?: string;
   blocked?: boolean;
+  creatorUserId?: string;
   assignees?: string[];
+  assigneeIds?: string[];
   participants?: string[];
+  participantIds?: string[];
   attachments?: AnyRecord[];
   comments?: AnyRecord[];
 };

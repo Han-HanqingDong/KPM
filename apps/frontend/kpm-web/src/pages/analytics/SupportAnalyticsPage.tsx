@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { EChart } from '../../components/charts/EChart';
 import { CustomerSelect } from '../../components/common/CustomerSelect';
 import { DataState } from '../../components/common/DataState';
+import { FullscreenView } from '../../components/common/FullscreenView';
 import { kpmApi } from '../../services/kpmApi';
 import { useKpmData } from '../../hooks/useKpmData';
 import type { AnyRecord } from '../../types';
@@ -68,7 +69,11 @@ export function SupportAnalyticsPage() {
       </Row>
       <Row gutter={[16, 16]} className="kpm-section-row">
         <Col xs={24} xl={14}>
-          <Card className="kpm-card" title="技术支持负载图">
+          <Card
+            className="kpm-card"
+            title="技术支持负载图"
+            extra={<FullscreenView title="技术支持负载图 - 全屏" fullscreenChildren={<EChart option={chartOption} height="calc(100vh - 170px)" />} />}
+          >
             <EChart option={chartOption} height={420} />
           </Card>
         </Col>
@@ -83,6 +88,7 @@ export function SupportAnalyticsPage() {
               { title: '技术支持', dataIndex: 'supportOwner', ellipsis: true },
               { title: '需求', dataIndex: 'openRequirementCount', render: (value) => <Tag color="cyan">{value || 0}</Tag> },
               { title: 'Bug', dataIndex: 'openBugCount', render: (value) => <Tag color="red">{value || 0}</Tag> },
+              { title: '其他', dataIndex: 'openOtherCount', render: (value) => <Tag color="blue">{value || 0}</Tag> },
               { title: '卡点', dataIndex: 'blockedCount', render: (value) => <Tag color="orange">{value || 0}</Tag> },
             ]} />
           </Card>

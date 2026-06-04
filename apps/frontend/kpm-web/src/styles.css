@@ -331,6 +331,46 @@ button { font-family: inherit; }
 .activity-matrix-table .ant-table-cell {
   vertical-align: top;
 }
+.activity-matrix-hint {
+  display: block;
+  margin: -2px 0 12px;
+}
+.activity-matrix-table .ant-table {
+  overflow: auto !important;
+}
+.activity-matrix-table .ant-table-container,
+.activity-matrix-table .ant-table-content,
+.activity-matrix-table .ant-table-body {
+  overflow-x: auto !important;
+}
+.activity-matrix-table .ant-table-body {
+  overflow-y: auto !important;
+  scrollbar-gutter: stable both-edges;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(64, 81, 111, .5) rgba(226, 235, 248, .9);
+}
+.activity-matrix-table .ant-table-body::-webkit-scrollbar,
+.activity-matrix-table .ant-table-content::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+.activity-matrix-table .ant-table-body::-webkit-scrollbar-track,
+.activity-matrix-table .ant-table-content::-webkit-scrollbar-track {
+  background: rgba(226, 235, 248, .9);
+  border-radius: 999px;
+}
+.activity-matrix-table .ant-table-body::-webkit-scrollbar-thumb,
+.activity-matrix-table .ant-table-content::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, rgba(31,215,199,.78), rgba(80,127,255,.72));
+  border: 3px solid rgba(226, 235, 248, .9);
+  border-radius: 999px;
+}
+.activity-matrix-table .ant-table-sticky-scroll {
+  display: block !important;
+}
+.activity-matrix-table-fullscreen .ant-table-body {
+  min-height: min(560px, calc(100vh - 310px));
+}
 .activity-cell {
   width: 100%;
   min-height: 72px;
@@ -609,6 +649,45 @@ button { font-family: inherit; }
 .ant-drawer-close:hover {
   background: rgba(255,242,0,.28) !important;
   color: var(--kozen-blue) !important;
+}
+.kpm-fullscreen-modal {
+  top: 16px !important;
+  max-width: calc(100vw - 32px) !important;
+  padding-bottom: 0 !important;
+}
+.kpm-fullscreen-modal .ant-modal-content {
+  height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+}
+.kpm-fullscreen-modal .ant-modal-body {
+  flex: 1;
+  min-height: 0;
+  padding: 16px !important;
+}
+.kpm-fullscreen-body {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(248,251,255,.86), rgba(240,247,255,.74));
+  scrollbar-gutter: stable both-edges;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(64, 81, 111, .5) rgba(226, 235, 248, .9);
+}
+.kpm-fullscreen-body::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+.kpm-fullscreen-body::-webkit-scrollbar-track {
+  background: rgba(226, 235, 248, .9);
+  border-radius: 999px;
+}
+.kpm-fullscreen-body::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, rgba(31,215,199,.78), rgba(80,127,255,.72));
+  border: 3px solid rgba(226, 235, 248, .9);
+  border-radius: 999px;
 }
 .ant-input,
 .ant-input-number,

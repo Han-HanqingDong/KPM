@@ -3,6 +3,7 @@ import type { AnyRecord, AppData, BootstrapData, Customer, DashboardStats, Login
 
 export const storageKeys = {
   token: 'kpm.authToken',
+  userId: 'kpm.currentUserId',
   account: 'kpm.currentAccount',
   userName: 'kpm.currentUserName',
   permissions: 'kpm.currentPermissions',

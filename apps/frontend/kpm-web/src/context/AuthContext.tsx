@@ -15,11 +15,12 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 function readUserFromStorage(): User | null {
+  const id = localStorage.getItem(storageKeys.userId);
   const account = localStorage.getItem(storageKeys.account);
   const name = localStorage.getItem(storageKeys.userName);
   if (!account || !name) return null;
   return {
-    id: account,
+    id: id || account,
     account,
     name,
     roles: JSON.parse(localStorage.getItem(storageKeys.roles) || '[]'),
@@ -29,6 +30,7 @@ function readUserFromStorage(): User | null {
 
 function persistSession(token: string, user: User) {
   localStorage.setItem(storageKeys.token, token);
+  localStorage.setItem(storageKeys.userId, user.id || user.account);
   localStorage.setItem(storageKeys.account, user.account);
   localStorage.setItem(storageKeys.userName, user.name);
   localStorage.setItem(storageKeys.permissions, JSON.stringify(user.permissions || []));

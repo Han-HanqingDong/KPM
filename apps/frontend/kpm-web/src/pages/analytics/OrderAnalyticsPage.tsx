@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { EChart } from '../../components/charts/EChart';
 import { CustomerSelect } from '../../components/common/CustomerSelect';
 import { DataState } from '../../components/common/DataState';
+import { FullscreenView } from '../../components/common/FullscreenView';
 import { ProjectSelect } from '../../components/common/ProjectSelect';
 import { kpmApi } from '../../services/kpmApi';
 import { useKpmData } from '../../hooks/useKpmData';
@@ -110,7 +111,11 @@ export function OrderAnalyticsPage() {
         <Col xs={24} md={8}><Card className="kpm-metric"><span>产品数量</span><strong>{totals.quantity}</strong></Card></Col>
         <Col xs={24} md={8}><Card className="kpm-metric"><span>销售额（已换算）</span><strong>{moneyText(totals.amount, currency)}</strong></Card></Col>
       </Row>
-      <Card className="kpm-card kpm-section-row" title="订单趋势与对比">
+      <Card
+        className="kpm-card kpm-section-row"
+        title="订单趋势与对比"
+        extra={<FullscreenView title="订单趋势与对比 - 全屏" fullscreenChildren={<EChart option={chartOption} height="calc(100vh - 170px)" />} />}
+      >
         <EChart option={chartOption} height={430} />
       </Card>
     </DataState>

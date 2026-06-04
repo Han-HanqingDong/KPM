@@ -3,6 +3,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { useMemo, useState } from 'react';
 import { CustomerSelect } from '../../components/common/CustomerSelect';
 import { DataState } from '../../components/common/DataState';
+import { FullscreenView } from '../../components/common/FullscreenView';
 import { ProjectSelect } from '../../components/common/ProjectSelect';
 import { useKpmData } from '../../hooks/useKpmData';
 import type { Customer, Order, Project, Task } from '../../types';
@@ -168,6 +169,23 @@ export function ActivityMatrixPage() {
     ];
   }, [cellByKey, projects, states]);
 
+  const matrixScrollX = Math.max(760, 220 + projects.length * 190);
+  const renderMatrixTable = (fullscreen = false) => (
+    <>
+      <Typography.Text type="secondary" className="activity-matrix-hint">提示：横向滚动可查看右侧更多项目列。</Typography.Text>
+      <Table<Customer>
+        className={`activity-matrix-table ${fullscreen ? 'activity-matrix-table-fullscreen' : ''}`}
+        size="small"
+        rowKey="id"
+        sticky
+        scroll={{ x: matrixScrollX, y: fullscreen ? 'calc(100vh - 245px)' : 620 }}
+        pagination={{ pageSize: fullscreen ? 20 : 10, showSizeChanger: true }}
+        dataSource={visibleCustomers}
+        columns={columns}
+      />
+    </>
+  );
+
   return (
     <DataState loading={isLoading} error={error}>
       <Card className="kpm-card kpm-filter-card">
@@ -180,17 +198,12 @@ export function ActivityMatrixPage() {
       <Card
         className="kpm-card"
         title="客户 × 项目活跃度矩阵"
-        extra={<Space wrap><Tag color="green">≤30天 活跃</Tag><Tag color="gold">31-90天 不活跃</Tag><Tag color="volcano">91-365天 异常</Tag><Tag color="red">&gt;365天 已放弃</Tag></Space>}
+        extra={<Space wrap>
+          <FullscreenView title="客户 × 项目活跃度矩阵 - 全屏" fullscreenChildren={renderMatrixTable(true)} />
+          <Tag color="green">≤30天 活跃</Tag><Tag color="gold">31-90天 不活跃</Tag><Tag color="volcano">91-365天 异常</Tag><Tag color="red">&gt;365天 已放弃</Tag>
+        </Space>}
       >
-        <Table<Customer>
-          className="activity-matrix-table"
-          size="small"
-          rowKey="id"
-          scroll={{ x: Math.max(760, 220 + projects.length * 190) }}
-          pagination={{ pageSize: 10, showSizeChanger: true }}
-          dataSource={visibleCustomers}
-          columns={columns}
-        />
+        {renderMatrixTable(false)}
       </Card>
       <Modal title="客户 × 项目活跃度明细" open={Boolean(selectedCell)} onCancel={() => setSelectedCell(null)} footer={null} width={860}>
         {selectedCell ? <Space direction="vertical" size={16} style={{ width: '100%' }}>

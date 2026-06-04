@@ -96,8 +96,8 @@ public interface AnalyticsMapper {
     @Select("""
             select c.id as customer_id, c.name as customer_name, coalesce(u.name, co.owner_name) as support_owner,
                    count(t.id) filter (where coalesce(ts.semantic, '普通') not in ('完成','拒绝') and t.category='需求') as open_requirement_count,
-                   count(t.id) filter (where coalesce(ts.semantic, '普通') not in ('完成','拒绝') and t.category='Bug') as open_bug_count,
-                   count(t.id) filter (where coalesce(ts.semantic, '普通') not in ('完成','拒绝') and t.category not in ('需求','Bug')) as open_other_count,
+                   count(t.id) filter (where coalesce(ts.semantic, '普通') not in ('完成','拒绝') and lower(coalesce(t.category, ''))='bug') as open_bug_count,
+                   count(t.id) filter (where coalesce(ts.semantic, '普通') not in ('完成','拒绝') and t.category <> '需求' and lower(coalesce(t.category, '')) <> 'bug') as open_other_count,
                    count(t.id) filter (where coalesce(ts.semantic, '普通') not in ('完成','拒绝') and t.blocked = true) as blocked_count
             from kpm_customers c
             join kpm_customer_owners co on co.customer_id=c.id and co.owner_type='support' and co.del_flag=0

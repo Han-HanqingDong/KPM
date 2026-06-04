@@ -16,7 +16,8 @@ import { confirmSubmit } from '../hooks/useConfirmingForm';
 import { kpmApi } from '../services/kpmApi';
 import type { AnyRecord, Task } from '../types';
 import { MAX_ATTACHMENT_SIZE_MB, attachmentLimitMessage, downloadBusinessFile, isWithinAttachmentLimit, normalizeUploadFiles, uploadBusinessFiles } from '../utils/fileUpload';
-import { compactId, compareDateDesc, dateText, dateTimeText, enumValues, includesKeyword, isAssignedToUser, isClosedTaskStatus, isCompletedTaskStatus } from '../utils/format';
+import { compactId, compareDateDesc, dateText, dateTimeText, enumValues, includesKeyword, isClosedTaskStatus, isCompletedTaskStatus } from '../utils/format';
+import { resolveTaskUser, taskAssignedToUser, taskRelatedToUser } from '../utils/taskScope';
 import { validationRules } from '../validation';
 
 function uploadFileList(event: AnyRecord) {
@@ -60,15 +61,18 @@ export function TasksPage() {
     const requestedId = searchParams.get('id');
     const assigneeScope = searchParams.get('assignee');
     const statusScope = searchParams.get('status');
-    const currentName = user?.name || user?.account || '';
+    const explicitUserId = searchParams.get('assigneeUserId') || searchParams.get('userId');
+    const relationScope = searchParams.get('scope');
+    const currentUser = resolveTaskUser(data?.bootstrap?.users || [], user, explicitUserId);
     return (data?.tasks || [])
       .filter((task) => {
         if (requestedId && task.id !== requestedId) return false;
+        if (relationScope === 'related' && !taskRelatedToUser(task, currentUser)) return false;
         if (assigneeScope === 'me') {
-          if (isClosedTaskStatus(task.status) || !isAssignedToUser(task.assignees, currentName)) return false;
+          if (isClosedTaskStatus(task.status) || !taskAssignedToUser(task, currentUser)) return false;
         }
         if (assigneeScope === 'others') {
-          if (isClosedTaskStatus(task.status) || isAssignedToUser(task.assignees, currentName)) return false;
+          if (isClosedTaskStatus(task.status) || !taskRelatedToUser(task, currentUser) || taskAssignedToUser(task, currentUser)) return false;
         }
         if (statusScope === 'completed' && !completedStatusValues.has(String(task.status || '')) && !isCompletedTaskStatus(task.status)) return false;
         const matchesKeyword = includesKeyword([task.taskNo, task.title, task.description, task.projectName, task.customerName], filters.keyword);
@@ -78,7 +82,7 @@ export function TasksPage() {
         return matchesKeyword && matchesStatus && matchesCategory && matchesCustomer;
       })
       .sort((left, right) => compareDateDesc(left.createdAt, right.createdAt) || String(right.id || '').localeCompare(String(left.id || '')));
-  }, [completedStatusValues, data?.tasks, filters, searchParams, user?.account, user?.name]);
+  }, [completedStatusValues, data?.bootstrap?.users, data?.tasks, filters, searchParams, user]);
 
   const activeDetail = useMemo(() => detail ? (data?.tasks || []).find((task) => task.id === detail.id) || detail : null, [data?.tasks, detail]);
 

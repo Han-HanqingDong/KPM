@@ -145,6 +145,14 @@ public interface TaskMapper {
     List<String> assignees(@Param("id") String id);
 
     @Select("""
+            select ta.user_id::text
+            from kpm_task_assignees ta
+            where ta.task_id=#{id} and ta.del_flag=0 and ta.user_id is not null
+            order by ta.user_id
+            """)
+    List<String> assigneeIds(@Param("id") String id);
+
+    @Select("""
             select coalesce(u.name, tp.participant_name)
             from kpm_task_participants tp
             left join kpm_users u on u.id = tp.user_id and u.del_flag=0
@@ -152,6 +160,14 @@ public interface TaskMapper {
             order by coalesce(u.name, tp.participant_name)
             """)
     List<String> participants(@Param("id") String id);
+
+    @Select("""
+            select tp.user_id::text
+            from kpm_task_participants tp
+            where tp.task_id=#{id} and tp.del_flag=0 and tp.user_id is not null
+            order by tp.user_id
+            """)
+    List<String> participantIds(@Param("id") String id);
 
     @Select("""
             select id,
@@ -238,4 +254,3 @@ public interface TaskMapper {
     @Update("update kpm_task_attachments set del_flag=1, update_time=current_timestamp where task_id=#{taskId} and id=#{attachmentId} and del_flag=0")
     void deleteAttachment(@Param("taskId") String taskId, @Param("attachmentId") String attachmentId);
 }
-

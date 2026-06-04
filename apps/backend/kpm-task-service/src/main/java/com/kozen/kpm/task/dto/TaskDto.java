@@ -30,7 +30,9 @@ public record TaskDto(
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
         List<String> assignees,
+        List<String> assigneeIds,
         List<String> participants,
+        List<String> participantIds,
         List<TaskAttachmentDto> attachments,
         List<TaskCommentDto> comments
 ) {}
