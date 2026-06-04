@@ -51,6 +51,6 @@ public class CustomerConverter {
     }
 
     public CustomerProjectDto toProjectDto(CustomerProjectEntity entity) {
-        return new CustomerProjectDto(entity.getId(), entity.getProjectStatus(), entity.getProjectId(), entity.getExternalName(), entity.getExternalName(), entity.getInternalName(), entity.getModelName(), entity.getSalesability());
+        return new CustomerProjectDto(entity.getId(), entity.getProjectStatus(), entity.getProjectId(), entity.getExternalName(), entity.getExternalName(), entity.getInternalName(), entity.getModelName());
     }
 }

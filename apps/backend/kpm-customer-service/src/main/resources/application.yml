@@ -6,6 +6,10 @@ spring:
     name: kpm-customer-service
   config:
     import: optional:nacos:${spring.application.name}.${spring.cloud.nacos.config.file-extension:yaml}
+  data:
+    redis:
+      host: ${KPM_VALKEY_HOST:127.0.0.1}
+      port: ${KPM_VALKEY_PORT:6379}
   datasource:
     url: jdbc:postgresql://${KPM_DB_HOST:127.0.0.1}:${KPM_DB_PORT:5432}/${KPM_DB_NAME:kpm}?stringtype=unspecified
     username: ${KPM_DB_USER:kpm}

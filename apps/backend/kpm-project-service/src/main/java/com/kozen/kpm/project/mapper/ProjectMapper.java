@@ -38,26 +38,22 @@ public interface ProjectMapper {
                    model_name as modelName,
                    manager_user_id as managerUserId,
                    manager_account as managerAccount,
-                   status,
                    archived,
-                   salesability,
-                   unsellable_reason as unsellableReason,
                    description,
                    created_at as createdAt,
                    updated_at as updatedAt
             from kpm_projects
             where (cast(#{keyword} as text) is null or #{keyword} = '' or external_name ilike #{keywordLike} or internal_name ilike #{keywordLike} or model_name ilike #{keywordLike})
-              and (cast(#{salesability} as text) is null or #{salesability} = '' or #{salesability} like '全部%' or salesability = #{salesability})
               and (cast(#{archived,jdbcType=BOOLEAN} as boolean) is null or archived = #{archived,jdbcType=BOOLEAN})
               and del_flag=0
             order by created_at desc, external_name
             """)
-    List<ProjectEntity> list(@Param("keyword") String keyword, @Param("keywordLike") String keywordLike, @Param("salesability") String salesability, @Param("archived") Boolean archived);
+    List<ProjectEntity> list(@Param("keyword") String keyword, @Param("keywordLike") String keywordLike, @Param("archived") Boolean archived);
 
-    default List<ProjectEntity> list(String keyword, String salesability, Boolean archived) {
+    default List<ProjectEntity> list(String keyword, Boolean archived) {
         String trimmed = keyword == null ? null : keyword.trim();
         String like = trimmed == null || trimmed.isBlank() ? "" : "%" + trimmed + "%";
-        return list(trimmed, like, salesability, archived);
+        return list(trimmed, like, archived);
     }
 
     @Select("""
@@ -67,10 +63,7 @@ public interface ProjectMapper {
                    model_name as modelName,
                    manager_user_id as managerUserId,
                    manager_account as managerAccount,
-                   status,
                    archived,
-                   salesability,
-                   unsellable_reason as unsellableReason,
                    description,
                    created_at as createdAt,
                    updated_at as updatedAt
@@ -105,8 +98,8 @@ public interface ProjectMapper {
     String enumSemantic(@Param("enumType") String enumType, @Param("value") String value);
 
     @Insert("""
-            insert into kpm_projects (id, external_name, internal_name, model_name, manager_user_id, manager_account, status, archived, salesability, unsellable_reason, description)
-            values (#{command.id}, #{command.externalName}, #{command.internalName}, #{command.modelName}, #{command.managerUserId}, #{command.managerAccount}, #{command.status}, false, #{command.salesability}, #{command.unsellableReason}, #{command.description})
+            insert into kpm_projects (id, external_name, internal_name, model_name, manager_user_id, manager_account, archived, description)
+            values (#{command.id}, #{command.externalName}, #{command.internalName}, #{command.modelName}, #{command.managerUserId}, #{command.managerAccount}, false, #{command.description})
             """)
     void insertProject(@Param("command") ProjectWriteCommand command);
 
@@ -117,8 +110,6 @@ public interface ProjectMapper {
                 model_name=#{command.modelName},
                 manager_user_id=#{command.managerUserId},
                 manager_account=#{command.managerAccount},
-                salesability=#{command.salesability},
-                unsellable_reason=#{command.unsellableReason},
                 description=#{command.description},
                 updated_at=current_timestamp,
                 update_time=current_timestamp
@@ -235,12 +226,6 @@ public interface ProjectMapper {
     @Update("update kpm_project_stages set status=#{status}, update_time=current_timestamp where id=#{stageId} and del_flag=0")
     void updateStageStatus(@Param("stageId") String stageId, @Param("status") String status);
 
-    @Select("select status from kpm_project_stages where project_id=#{projectId} and del_flag=0")
-    List<String> stageStatuses(@Param("projectId") String projectId);
-
-    @Update("update kpm_projects set status=#{status}, updated_at=current_timestamp, update_time=current_timestamp where id=#{projectId} and del_flag=0")
-    void updateProjectStatus(@Param("projectId") String projectId, @Param("status") String status);
-
     @Update("update kpm_projects set archived=#{archived}, updated_at=current_timestamp, update_time=current_timestamp where id=#{projectId} and del_flag=0")
     void archiveProject(@Param("projectId") String projectId, @Param("archived") Boolean archived);
 
@@ -267,6 +252,7 @@ public interface ProjectMapper {
                    file_name as fileName,
                    file_type as fileType,
                    file_size as fileSize,
+                   description,
                    uploader,
                    bucket,
                    object_key as objectKey,
@@ -280,8 +266,8 @@ public interface ProjectMapper {
 
     @Insert("""
             insert into kpm_stage_materials
-            (id, stage_id, file_name, file_type, file_size, uploader, bucket, object_key, storage_url, storage_category, published_to_project)
-            values (#{id}, #{stageId}, #{request.fileName}, #{request.fileType}, #{request.fileSize}, #{request.uploader}, #{request.bucket}, #{request.objectKey}, #{request.storageUrl}, coalesce(#{request.storageCategory}, #{request.category}), false)
+            (id, stage_id, file_name, file_type, file_size, description, uploader, bucket, object_key, storage_url, storage_category, published_to_project)
+            values (#{id}, #{stageId}, #{request.fileName}, #{request.fileType}, #{request.fileSize}, #{request.description}, #{request.uploader}, #{request.bucket}, #{request.objectKey}, #{request.storageUrl}, coalesce(#{request.storageCategory}, #{request.category}), false)
             """)
     void insertStageMaterial(@Param("id") String id, @Param("stageId") String stageId, @Param("request") FileMetadataRequest request);
 
@@ -306,6 +292,7 @@ public interface ProjectMapper {
                    sm.file_name as fileName,
                    sm.file_type as fileType,
                    sm.file_size as fileSize,
+                   sm.description,
                    sm.uploader,
                    sm.bucket,
                    sm.object_key as objectKey,
@@ -323,10 +310,24 @@ public interface ProjectMapper {
 
     @Insert("""
             insert into kpm_project_materials
-            (id, project_id, source_stage, file_name, file_type, file_size, uploader, bucket, object_key, storage_url, storage_category, share_target)
-            values (#{id}, #{material.projectId}, #{material.stageName}, #{material.fileName}, #{material.fileType}, #{material.fileSize}, #{material.uploader}, #{material.bucket}, #{material.objectKey}, #{material.storageUrl}, #{material.storageCategory}, '项目资料区')
+            (id, project_id, source_stage, file_name, file_type, file_size, description, uploader, bucket, object_key, storage_url, storage_category, share_target, public_visible)
+            values (#{id}, #{material.projectId}, #{material.stageName}, #{material.fileName}, #{material.fileType}, #{material.fileSize}, #{material.description}, #{material.uploader}, #{material.bucket}, #{material.objectKey}, #{material.storageUrl}, #{material.storageCategory}, '项目资料区', false)
             """)
     void insertProjectMaterial(@Param("id") String id, @Param("material") ProjectFileEntity material);
+
+    @Insert("""
+            insert into kpm_project_materials
+            (id, project_id, source_stage, file_name, file_type, file_size, description, uploader, bucket, object_key, storage_url, storage_category, share_target, public_visible)
+            values (#{id}, #{projectId}, '直接上传', #{request.fileName}, #{request.fileType}, #{request.fileSize}, #{request.description}, #{request.uploader}, #{request.bucket}, #{request.objectKey}, #{request.storageUrl}, coalesce(#{request.storageCategory}, #{request.category}), '项目资料区', false)
+            """)
+    void insertProjectMaterialFromRequest(@Param("id") String id, @Param("projectId") String projectId, @Param("request") FileMetadataRequest request);
+
+    @Update("""
+            update kpm_project_materials
+            set public_visible=true, public_at=current_timestamp, updator=#{operator}, update_time=current_timestamp
+            where id=#{materialId} and project_id=#{projectId} and del_flag=0
+            """)
+    int markProjectMaterialPublic(@Param("projectId") String projectId, @Param("materialId") String materialId, @Param("operator") String operator);
 
     @Select("""
             select id,
@@ -335,13 +336,16 @@ public interface ProjectMapper {
                    file_name as fileName,
                    file_type as fileType,
                    file_size as fileSize,
+                   description,
                    uploader,
                    bucket,
                    object_key as objectKey,
                    storage_url as storageUrl,
                    storage_category as storageCategory,
                    share_target as shareTarget,
-                   published_at as publishedAt
+                   public_visible as publicVisible,
+                   published_at as publishedAt,
+                   public_at as publicAt
             from kpm_project_materials where project_id=#{projectId} and del_flag=0 order by published_at desc
             """)
     List<ProjectFileEntity> projectMaterials(@Param("projectId") String projectId);
@@ -442,6 +446,38 @@ public interface ProjectMapper {
 
     @Insert("insert into kpm_task_assignees (task_id, user_id, assignee_name) values (#{taskId}, #{userId}, #{assigneeName})")
     void insertRequirementTaskAssignee(@Param("taskId") String taskId, @Param("userId") String userId, @Param("assigneeName") String assigneeName);
+
+    @Insert("""
+            insert into kpm_project_announcements
+            (id, project_id, title, content, announcement_type, publisher)
+            values (#{id}, #{projectId}, #{title}, #{content}, #{announcementType}, #{publisher})
+            """)
+    void insertProjectAnnouncement(
+            @Param("id") String id,
+            @Param("projectId") String projectId,
+            @Param("title") String title,
+            @Param("content") String content,
+            @Param("announcementType") String announcementType,
+            @Param("publisher") String publisher
+    );
+
+    @Insert("""
+            insert into kpm_customer_portal_messages
+            (customer_id, contact_id, contact_email, title, content, message_type, project_id, announcement_id)
+            select c.id,
+                   cc.id,
+                   lower(cc.email),
+                   #{title},
+                   #{content},
+                   'announcement',
+                   #{projectId},
+                   #{announcementId}
+            from kpm_project_customers pc
+            join kpm_customers c on c.id=pc.customer_id and c.del_flag=0
+            join kpm_customer_contacts cc on cc.customer_id=c.id and cc.del_flag=0 and cc.email is not null and cc.email <> ''
+            where pc.project_id=#{projectId} and pc.del_flag=0
+            """)
+    void insertCustomerPortalMessagesForAnnouncement(@Param("projectId") String projectId, @Param("announcementId") String announcementId, @Param("title") String title, @Param("content") String content);
 
     @Select("select nextval('kpm_task_no_seq')")
     Long nextTaskNumber();

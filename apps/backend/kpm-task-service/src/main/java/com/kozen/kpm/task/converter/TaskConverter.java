@@ -75,6 +75,7 @@ public class TaskConverter {
                 comment.getId(),
                 comment.getTaskId(),
                 comment.getAuthor(),
+                comment.getCommentType(),
                 comment.getContent(),
                 comment.getAttachments() == null ? List.of() : JsonUtil.fromJson(comment.getAttachments()),
                 comment.getCreatedAt()

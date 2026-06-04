@@ -1,13 +1,7 @@
 -- Add enum semantics used by backend business rules. Values stay configurable; semantic tells services how to interpret them.
-UPDATE kpm_enum_items SET semantic='DEFAULT' WHERE enum_type='project_status' AND value='未开始';
-UPDATE kpm_enum_items SET semantic='ACTIVE' WHERE enum_type='project_status' AND value='进行中';
-UPDATE kpm_enum_items SET semantic='COMPLETED' WHERE enum_type='project_status' AND value='已完成';
-
 UPDATE kpm_enum_items SET semantic='DEFAULT' WHERE enum_type='stage_status' AND value='未开始';
 UPDATE kpm_enum_items SET semantic='ACTIVE' WHERE enum_type='stage_status' AND value='进行中';
 UPDATE kpm_enum_items SET semantic='COMPLETED' WHERE enum_type='stage_status' AND value='已完成';
-
-UPDATE kpm_enum_items SET semantic='DEFAULT' WHERE enum_type='salesability' AND value='不可销售';
 
 UPDATE kpm_enum_items SET semantic='DEFAULT' WHERE enum_type='customer_master_status' AND value='潜在客户';
 UPDATE kpm_enum_items SET semantic='DEFAULT' WHERE enum_type='customer_level' AND value='C / 普通客户';

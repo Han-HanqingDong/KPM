@@ -11,6 +11,7 @@ public record ProjectFileDto(
         String fileName,
         String fileType,
         String fileSize,
+        String description,
         String uploader,
         String bucket,
         String objectKey,
@@ -18,6 +19,8 @@ public record ProjectFileDto(
         String storageCategory,
         String shareTarget,
         Boolean publishedToProject,
+        Boolean publicVisible,
         LocalDateTime uploadedAt,
-        LocalDateTime publishedAt
+        LocalDateTime publishedAt,
+        LocalDateTime publicAt
 ) {}

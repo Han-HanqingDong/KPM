@@ -8,8 +8,5 @@ public record ProjectWriteCommand(
         String modelName,
         String managerUserId,
         String managerAccount,
-        String status,
-        String salesability,
-        String unsellableReason,
         String description
 ) {}

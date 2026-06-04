@@ -10,6 +10,7 @@ import com.kozen.kpm.project.dto.ProjectCustomerStatusRequest;
 import com.kozen.kpm.project.dto.ProjectDto;
 import com.kozen.kpm.project.dto.ProjectMembersRequest;
 import com.kozen.kpm.project.dto.ProjectRequest;
+import com.kozen.kpm.project.dto.ProjectAnnouncementRequest;
 import com.kozen.kpm.project.dto.ProjectSkuDto;
 import com.kozen.kpm.project.dto.ProjectSkuRequest;
 import com.kozen.kpm.project.dto.RequirementDto;
@@ -24,6 +25,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
 
 @RestController
@@ -38,11 +41,10 @@ public class ProjectApiController {
     }
 
     @GetMapping
-    @Operation(summary = "查询项目列表", description = "支持按关键字、可销售状态和归档状态过滤。")
+    @Operation(summary = "查询项目列表", description = "支持按关键字和归档状态过滤；项目总体进度由阶段状态体现。")
     public ApiResponse<List<ProjectDto>> list(@RequestParam(required = false) String keyword,
-                                                        @RequestParam(required = false) String salesability,
                                                         @RequestParam(required = false) Boolean archived) {
-        return ApiResponse.ok(projectService.list(keyword, salesability, archived));
+        return ApiResponse.ok(projectService.list(keyword, archived));
     }
 
     @GetMapping("/{id}")
@@ -70,9 +72,11 @@ public class ProjectApiController {
     }
 
     @PutMapping("/stages/{stageId}")
-    @Operation(summary = "修改阶段状态", description = "阶段负责人维护阶段状态后，系统自动同步项目总体状态。")
-    public ApiResponse<ProjectDto> updateStage(@PathVariable String stageId, @Valid @RequestBody StageStatusRequest request) {
-        return ApiResponse.ok(projectService.updateStage(stageId, request));
+    @Operation(summary = "修改阶段状态", description = "只有该阶段配置的负责人可以维护阶段状态；项目不再保存独立总体状态。")
+    public ApiResponse<ProjectDto> updateStage(@PathVariable String stageId,
+                                               @Valid @RequestBody StageStatusRequest request,
+                                               @RequestHeader(value = "X-KPM-Account", required = false) String operatorAccount) {
+        return ApiResponse.ok(projectService.updateStage(stageId, request, operatorAccount));
     }
 
     @PutMapping("/stages/{stageId}/assignees")
@@ -144,10 +148,32 @@ public class ProjectApiController {
         return ApiResponse.ok(projectService.addStageMaterial(stageId, request));
     }
 
+    @PostMapping("/{id}/materials")
+    @Operation(summary = "新增项目资料", description = "直接上传或记录项目资料区文件元数据。")
+    public ApiResponse<ProjectDto> addProjectMaterial(@PathVariable String id, @Valid @RequestBody FileMetadataRequest request) {
+        return ApiResponse.ok(projectService.addProjectMaterial(id, request));
+    }
+
+    @PostMapping("/{id}/materials/{materialId}/public")
+    @Operation(summary = "公开项目资料给客户", description = "经过二次确认后，将项目资料标记为客户门户可见。")
+    public ApiResponse<ProjectDto> publishProjectMaterialToCustomer(@PathVariable String id, @PathVariable String materialId) {
+        return ApiResponse.ok(projectService.publishProjectMaterialToCustomer(id, materialId));
+    }
+
     @PostMapping("/stage-materials/{materialId}/publish")
     @Operation(summary = "发布阶段资料到项目资料区", description = "经过二次确认后，将阶段资料发布到项目资料区。")
     public ApiResponse<ProjectDto> publishStageMaterial(@PathVariable String materialId) {
         return ApiResponse.ok(projectService.publishStageMaterial(materialId));
+    }
+
+    @PostMapping("/{id}/announcements")
+    @Operation(summary = "发布项目公告", description = "向项目关联客户发布公告；客户门户顶部滚动展示，并同步进入客户消息盒子。")
+    public ApiResponse<ProjectDto> publishAnnouncement(@PathVariable String id,
+                                                       @Valid @RequestBody ProjectAnnouncementRequest request,
+                                                       @RequestHeader(value = "X-KPM-User-Name-Base64", required = false) String encodedPublisher,
+                                                       @RequestHeader(value = "X-KPM-User", required = false) String publisher,
+                                                       @RequestHeader(value = "X-KPM-Account", required = false) String publisherAccount) {
+        return ApiResponse.ok(projectService.publishAnnouncement(id, request, resolvePublisher(encodedPublisher, publisher, publisherAccount)));
     }
 
     @PostMapping("/{id}/archive")
@@ -204,5 +230,26 @@ public class ProjectApiController {
     @Operation(summary = "删除流程模板", description = "删除指定流程模板及模板阶段。")
     public ApiResponse<Boolean> deleteTemplate(@PathVariable String id) {
         return ApiResponse.ok(projectService.deleteTemplate(id));
+    }
+
+    private String resolvePublisher(String encodedPublisher, String publisher, String publisherAccount) {
+        String decoded = decodeBase64Utf8(encodedPublisher);
+        if (hasText(decoded)) return decoded;
+        if (hasText(publisher) && !publisher.contains("?")) return publisher.trim();
+        if (hasText(publisherAccount)) return publisherAccount.trim();
+        return "系统";
+    }
+
+    private String decodeBase64Utf8(String value) {
+        if (!hasText(value)) return "";
+        try {
+            return new String(Base64.getUrlDecoder().decode(value.trim()), StandardCharsets.UTF_8).trim();
+        } catch (IllegalArgumentException ignored) {
+            return "";
+        }
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
     }
 }

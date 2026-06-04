@@ -5,6 +5,8 @@ import com.kozen.kpm.common.dto.FileMetadataRequest;
 import com.kozen.kpm.customer.dto.CustomerContactRequest;
 import com.kozen.kpm.customer.dto.CustomerDto;
 import com.kozen.kpm.customer.dto.CustomerFollowupRequest;
+import com.kozen.kpm.customer.dto.CustomerNotificationRequest;
+import com.kozen.kpm.customer.dto.CustomerNotificationResultDto;
 import com.kozen.kpm.customer.dto.CustomerRequest;
 import com.kozen.kpm.customer.service.CustomerService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -12,6 +14,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
 
 @RestController
@@ -73,9 +77,40 @@ public class CustomerApiController {
         return ApiResponse.ok(customerService.addFollowup(id, request));
     }
 
+
+    @PostMapping("/{id}/notifications")
+    @Operation(summary = "发送客户通知", description = "向客户所有配置了邮箱的联系人发送客户门户系统消息，并在邮件配置启用时同步发送邮件。")
+    public ApiResponse<CustomerNotificationResultDto> sendNotification(@PathVariable String id,
+                                                                        @Valid @RequestBody CustomerNotificationRequest request,
+                                                                        @RequestHeader(value = "X-KPM-User-Name-Base64", required = false) String encodedPublisher,
+                                                                        @RequestHeader(value = "X-KPM-User", required = false) String publisher,
+                                                                        @RequestHeader(value = "X-KPM-Account", required = false) String publisherAccount) {
+        return ApiResponse.ok(customerService.sendNotification(id, request, resolvePublisher(encodedPublisher, publisher, publisherAccount)));
+    }
+
     @PostMapping("/{id}/materials")
     @Operation(summary = "新增客户资料", description = "记录客户资料库中的文件元数据，后续可接入 OSS 文件存储。")
     public ApiResponse<CustomerDto> addMaterial(@PathVariable String id, @Valid @RequestBody FileMetadataRequest request) {
         return ApiResponse.ok(customerService.addMaterial(id, request));
+    }
+    private String resolvePublisher(String encodedPublisher, String publisher, String publisherAccount) {
+        String decoded = decodeBase64Utf8(encodedPublisher);
+        if (hasText(decoded)) return decoded;
+        if (hasText(publisher) && !publisher.contains("?")) return publisher.trim();
+        if (hasText(publisherAccount)) return publisherAccount.trim();
+        return "系统";
+    }
+
+    private String decodeBase64Utf8(String value) {
+        if (!hasText(value)) return "";
+        try {
+            return new String(Base64.getUrlDecoder().decode(value.trim()), StandardCharsets.UTF_8).trim();
+        } catch (IllegalArgumentException ignored) {
+            return "";
+        }
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
     }
 }

@@ -38,6 +38,9 @@ INSERT INTO kpm_permissions (id, code, name, permission_type, target, location) 
 (3019,'button:project-detail:customers-entry','项目详情 / 客户列表入口','按钮权限','进入','项目详情'),
 (3020,'button:project-detail:materials-entry','项目详情 / 项目资料区入口','按钮权限','进入','项目详情'),
 (3021,'button:project-detail:requirement-overview-entry','项目详情 / 需求纵览入口','按钮权限','进入','项目详情'),
+(3094,'button:project-detail:edit-members','项目详情 / 维护成员','按钮权限','维护成员','项目详情'),
+(3095,'button:project-materials:upload','项目详情 / 上传项目资料','按钮权限','上传项目资料','项目详情'),
+(3096,'button:project-materials:publish-customer','项目详情 / 公开项目资料','按钮权限','公开项目资料','项目详情'),
 (3022,'button:project-edit:save','项目编辑 / 保存项目','按钮权限','保存项目','项目编辑'),
 (3023,'button:project-skus:save','项目详情 / 保存 SKU','按钮权限','保存 SKU','项目详情'),
 (3024,'button:project-skus:delete','项目详情 / 删除 SKU','按钮权限','删除 SKU','项目详情'),
@@ -109,16 +112,15 @@ INSERT INTO kpm_permissions (id, code, name, permission_type, target, location) 
 (3090,'button:orders:create','订单管理 / 新增订单','按钮权限','新增订单','订单管理'),
 (3091,'button:orders:edit','订单管理 / 编辑订单','按钮权限','编辑订单','订单管理'),
 (3092,'button:orders:delete','订单管理 / 删除订单','按钮权限','删除订单','订单管理'),
-(3093,'button:orders:view-history','订单管理 / 查看修改记录','按钮权限','查看修改记录','订单管理');
+(3093,'button:orders:view-history','订单管理 / 查看修改记录','按钮权限','查看修改记录','订单管理'),
+(3097,'button:project-detail:publish-announcement','项目详情 / 发布公告','按钮权限','发布公告','项目详情'),
+(3098,'button:customer-detail:send-notification','客户详情 / 发送通知','按钮权限','发送通知','客户详情');
 
 INSERT INTO kpm_role_permissions (role_id, permission_id)
 SELECT 2001, id FROM kpm_permissions;
 
 INSERT INTO kpm_enum_items (id, enum_type, name, value, semantic, active, sort_order) VALUES
-(5001,'project_status','未开始','未开始','DEFAULT',true,10),(5002,'project_status','进行中','进行中','ACTIVE',true,20),(5003,'project_status','已完成','已完成','COMPLETED',true,30),
 (5004,'stage_status','未开始','未开始','DEFAULT',true,10),(5005,'stage_status','进行中','进行中','ACTIVE',true,20),(5006,'stage_status','已完成','已完成','COMPLETED',true,30),
-(5007,'salesability','可销售','可销售',NULL,true,10),(5008,'salesability','不可销售','不可销售','DEFAULT',true,20),
-(5009,'unsellable_reason','仍处于设计或测试阶段','仍处于设计或测试阶段',NULL,true,10),(5010,'unsellable_reason','产品过老，不再继续推广','产品过老，不再继续推广',NULL,true,20),(5011,'unsellable_reason','被遗弃的老项目','被遗弃的老项目',NULL,true,30),
 (5012,'customer_master_status','潜在客户','潜在客户','DEFAULT',true,10),(5013,'customer_master_status','合作中','合作中',NULL,true,20),(5014,'customer_master_status','已停用','已停用',NULL,true,30),
 (5015,'customer_project_status','商机发掘','商机发掘','DEFAULT',true,10),(5016,'customer_project_status','样机测试','样机测试',NULL,true,20),(5017,'customer_project_status','研发投入','研发投入',NULL,true,30),(5018,'customer_project_status','订单冲刺','订单冲刺',NULL,true,40),(5019,'customer_project_status','首单护航','首单护航',NULL,true,50),(5020,'customer_project_status','量产维护','量产维护',NULL,true,60),(5021,'customer_project_status','EOL 声明','EOL 声明',NULL,true,70),(5022,'customer_project_status','EOL','EOL',NULL,true,80),(5023,'customer_project_status','Support Ended','Support Ended',NULL,true,90),
 (5024,'customer_level','A / 战略客户','A / 战略客户',NULL,true,10),(5025,'customer_level','B / 重点客户','B / 重点客户',NULL,true,20),(5026,'customer_level','C / 普通客户','C / 普通客户','DEFAULT',true,30),(5027,'customer_level','D / 观察客户','D / 观察客户',NULL,true,40),(5028,'customer_level','黑名单 / 暂停合作','黑名单 / 暂停合作',NULL,true,50),
@@ -129,7 +131,8 @@ INSERT INTO kpm_enum_items (id, enum_type, name, value, semantic, active, sort_o
 (5045,'priority','高','高',NULL,true,10),(5046,'priority','中','中','DEFAULT',true,20),(5047,'priority','低','低',NULL,true,30),
 (5057,'task_priority','高','高',NULL,true,10),(5058,'task_priority','中','中','DEFAULT',true,20),(5059,'task_priority','低','低',NULL,true,30),
 (5048,'requirement_status','待评估','待评估','DEFAULT',true,10),(5049,'requirement_status','已采纳','已采纳',NULL,true,20),(5050,'requirement_status','实现中','实现中',NULL,true,30),(5051,'requirement_status','已实现','已实现','完成',true,40),(5052,'requirement_status','已拒绝','已拒绝','拒绝',true,50),(5053,'requirement_status','已作废','已作废','VOID',true,60),
-(5054,'currency','USD','USD',NULL,true,10),(5055,'currency','EUR','EUR',NULL,true,20),(5056,'currency','CNY','CNY',NULL,true,30);
+(5054,'currency','USD','USD',NULL,true,10),(5055,'currency','EUR','EUR',NULL,true,20),(5056,'currency','CNY','CNY',NULL,true,30),
+(5060,'project_announcement_type','普通公告','普通公告','DEFAULT',true,10),(5061,'project_announcement_type','产品 EOL 公告','产品EOL公告','EOL',true,20);
 
 INSERT INTO kpm_task_status_transitions (id, from_status, to_status) VALUES
 (7001,'待处理','进行中'),(7002,'待处理','已拒绝'),(7003,'进行中','已完成'),(7004,'进行中','已拒绝'),(7005,'已拒绝','进行中');

@@ -10,7 +10,6 @@ public record ProjectStageRequest(
         @Size(max = 80, message = "阶段ID不能超过80个字符") String id,
         @NotBlank(message = "阶段名称不能为空")
         @Size(max = 80, message = "阶段名称不能超过80个字符") String name,
-        @Size(max = 40, message = "阶段状态不能超过40个字符") String status,
         @Valid @Size(max = 30, message = "阶段负责人不能超过30项") List<StageAssigneeRequest> assignees
 ) {
     public List<StageAssigneeRequest> safeAssignees() { return assignees == null ? List.of() : assignees; }

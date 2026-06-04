@@ -9,6 +9,7 @@ import com.kozen.kpm.project.dto.ProjectCustomerStatusRequest;
 import com.kozen.kpm.project.dto.ProjectDto;
 import com.kozen.kpm.project.dto.ProjectMembersRequest;
 import com.kozen.kpm.project.dto.ProjectRequest;
+import com.kozen.kpm.project.dto.ProjectAnnouncementRequest;
 import com.kozen.kpm.project.dto.ProjectSkuDto;
 import com.kozen.kpm.project.dto.ProjectSkuRequest;
 import com.kozen.kpm.project.dto.RequirementDto;
@@ -26,13 +27,13 @@ import java.util.List;
  * stage records, project-customer links, requirements and process templates.
  */
 public interface ProjectService {
-    /** Query project list by keyword, salesability and archive status. */
-    List<ProjectDto> list(String keyword, String salesability, Boolean archived);
+    /** Query project list by keyword and archive status. */
+    List<ProjectDto> list(String keyword, Boolean archived);
 
     /** Load one project with members, stages, customers, requirements and materials. */
     ProjectDto detail(String id);
 
-    /** Create a project, initialize members and project stages, then sync project status. */
+    /** Create a project and initialize members and project stages. */
     ProjectDto create(ProjectRequest request);
 
     /** Update project base data, optionally replacing members and stage assignees. */
@@ -41,8 +42,8 @@ public interface ProjectService {
     /** Delete one project by ID. */
     boolean delete(String id);
 
-    /** Update stage status and sync the derived project status. */
-    ProjectDto updateStage(String stageId, StageStatusRequest request);
+    /** Update stage status. Only configured stage assignees can perform this operation. */
+    ProjectDto updateStage(String stageId, StageStatusRequest request, String operatorAccount);
 
     /** Replace all assignees of one project stage. */
     ProjectDto replaceStageAssignees(String stageId, StageAssigneesRequest request);
@@ -74,8 +75,17 @@ public interface ProjectService {
     /** Add one stage material metadata record. */
     ProjectDto addStageMaterial(String stageId, FileMetadataRequest request);
 
+    /** Add one project material metadata record directly to the project material area. */
+    ProjectDto addProjectMaterial(String projectId, FileMetadataRequest request);
+
     /** Publish a stage material to the project material area. */
     ProjectDto publishStageMaterial(String materialId);
+
+    /** Mark one project material as visible to customer portal users after confirmation. */
+    ProjectDto publishProjectMaterialToCustomer(String projectId, String materialId);
+
+    /** Publish a project announcement to linked customer portal contacts. */
+    ProjectDto publishAnnouncement(String projectId, ProjectAnnouncementRequest request, String publisher);
 
     /** Archive or unarchive a project. */
     ProjectDto archive(String id, ArchiveProjectRequest request);

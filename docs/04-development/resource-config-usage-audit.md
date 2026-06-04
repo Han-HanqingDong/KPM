@@ -16,7 +16,7 @@
 | 订单类型 | `order_type` | 订单新增/编辑、客户详情下单、订单统计 | 展示所有启用订单类型，并保留当前历史值 |
 | 客户主状态 | `customer_master_status` | 客户管理、资源客户维护 | 从资源 bootstrap 动态加载 |
 | 币种 | `currency` | 订单新增/编辑、统计换算目标 | 从资源 bootstrap 动态加载 |
-| 销售状态/不可销售原因 | `salesability` / `unsellable_reason` | 新建项目、编辑项目、项目筛选 | 从资源 bootstrap 动态加载 |
+| 项目可销售状态/不可销售原因 | `salesability` / `unsellable_reason` | 已废弃 | 2026-06-04 起项目主信息不再维护该字段；枚举已逻辑删除，前后端不再展示和使用 |
 
 ## 本轮修复
 

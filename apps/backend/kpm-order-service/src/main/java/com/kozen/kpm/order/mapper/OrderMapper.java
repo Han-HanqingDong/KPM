@@ -11,6 +11,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /** Order data access mapper backed by MyBatis. */
@@ -89,19 +90,28 @@ public interface OrderMapper {
     @Select("""
             <script>
             select ${columns}
-            from kpm_orders o join kpm_customers c on c.id=o.customer_id join kpm_projects p on p.id=o.project_id
-            left join kpm_project_skus ps on ps.id=o.sku_id
-            where (#{year} = '' or extract(year from o.order_date)::text = #{year})
-              and (#{customerId} = '' or o.customer_id::text = #{customerId})
-              and (#{projectId} = '' or o.project_id::text = #{projectId})
+            from kpm_orders o
+            join kpm_customers c on c.id=o.customer_id and c.del_flag=0
+            join kpm_projects p on p.id=o.project_id and p.del_flag=0
+            left join kpm_project_skus ps on ps.id=o.sku_id and ps.del_flag=0
+            where (#{startDate,jdbcType=DATE} is null or o.order_date &gt;= #{startDate,jdbcType=DATE})
+              and (#{endDate,jdbcType=DATE} is null or o.order_date &lt; #{endDate,jdbcType=DATE})
+              and (nullif(#{customerId}, '') is null or o.customer_id = nullif(#{customerId}, '')::bigint)
+              and (nullif(#{projectId}, '') is null or o.project_id = nullif(#{projectId}, '')::bigint)
               and o.del_flag=0
             order by o.order_date desc, o.id desc
             </script>
             """)
-    List<OrderEntity> list(@Param("columns") String columns, @Param("year") String year, @Param("customerId") String customerId, @Param("projectId") String projectId);
+    List<OrderEntity> list(
+            @Param("columns") String columns,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
+            @Param("customerId") String customerId,
+            @Param("projectId") String projectId
+    );
 
-    default List<OrderEntity> list(String year, String customerId, String projectId) {
-        return list(ORDER_SELECT_COLUMNS, year, customerId, projectId);
+    default List<OrderEntity> list(LocalDate startDate, LocalDate endDate, String customerId, String projectId) {
+        return list(ORDER_SELECT_COLUMNS, startDate, endDate, customerId, projectId);
     }
 
     @Select("""
@@ -131,6 +141,25 @@ public interface OrderMapper {
             order by modified_at desc
             """)
     List<OrderHistoryEntity> histories(@Param("orderId") String orderId);
+
+    @Select("""
+            <script>
+            select id,
+                   order_id as orderId,
+                   modifier,
+                   modified_at as modifiedAt,
+                   changes,
+                   reason
+            from kpm_order_histories
+            where del_flag=0
+              and order_id in
+              <foreach collection="orderIds" item="orderId" open="(" separator="," close=")">
+                #{orderId}
+              </foreach>
+            order by order_id, modified_at desc
+            </script>
+            """)
+    List<OrderHistoryEntity> historiesForOrders(@Param("orderIds") List<String> orderIds);
 
     @Insert("""
             insert into kpm_orders

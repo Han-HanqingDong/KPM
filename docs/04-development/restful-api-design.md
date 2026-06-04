@@ -36,17 +36,20 @@
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/api/projects` | 项目列表，支持关键字、销售状态、归档状态过滤 |
+| GET | `/api/projects` | 项目列表，支持关键字、归档状态过滤；项目总体状态由阶段状态体现 |
 | GET | `/api/projects/{id}` | 项目详情 |
 | POST | `/api/projects` | 新建项目，项目负责人自动加入成员 |
 | PUT | `/api/projects/{id}` | 修改项目基本信息、成员、阶段负责人 |
 | DELETE | `/api/projects/{id}` | 删除项目 |
 | POST | `/api/projects/{id}/archive` | 归档/恢复项目 |
 | PUT | `/api/projects/{id}/members` | 替换项目成员 |
-| PUT | `/api/projects/stages/{stageId}` | 修改阶段状态；项目状态由阶段状态自动推导 |
+| PUT | `/api/projects/stages/{stageId}` | 修改阶段状态；仅阶段负责人可操作 |
 | POST | `/api/projects/stages/{stageId}/records` | 新增阶段留言/记录 |
-| POST | `/api/projects/stages/{stageId}/materials` | 新增阶段资料 |
-| POST | `/api/projects/stage-materials/{materialId}/publish` | 发布阶段资料到项目资料区 |
+| POST | `/api/projects/stages/{stageId}/materials` | 新增阶段资料，文件元数据支持 `description` 资料描述 |
+| POST | `/api/projects/stage-materials/{materialId}/publish` | 发布阶段资料到项目资料区，保留资料描述 |
+| POST | `/api/projects/{id}/materials` | 直接新增项目资料区文件元数据，支持 `description` 资料描述 |
+| POST | `/api/projects/{id}/materials/{materialId}/public` | 二次确认后公开项目资料给客户门户 |
+| POST | `/api/projects/{id}/announcements` | 发布项目公告；二次确认后同步到客户门户顶部公告和客户消息盒子 |
 | POST | `/api/projects/{projectId}/customers` | 关联项目客户 |
 | PUT | `/api/projects/{projectId}/customers/{customerId}` | 修改客户在项目中的状态 |
 | GET | `/api/projects/{id}/requirements-overview` | 需求纵览 |
@@ -72,6 +75,24 @@
 | POST | `/api/customers/{id}/materials` | 上传客户资料记录 |
 | POST | `/api/customers/{id}/followups` | 新增客户跟进记录 |
 
+
+## 客户门户 `/api/customer-portal`
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| POST | `/api/customer-portal/request-code` | 客户联系人邮箱发送动态验证码；邮箱必须存在于客户联系人信息中 |
+| POST | `/api/customer-portal/login` | 客户联系人验证码登录，返回客户门户 token |
+| GET | `/api/customer-portal/me` | 查询当前客户联系人身份 |
+| GET | `/api/customer-portal/data` | 查询客户关联项目、公开项目资料、公告、客户消息和客户任务进度 |
+| GET | `/api/customer-portal/messages` | 查询客户门户消息，支持 `unreadOnly` |
+| GET | `/api/customer-portal/unread-count` | 查询当前客户联系人未读消息数量 |
+| POST | `/api/customer-portal/messages/{id}/read` | 标记单条客户门户消息已读 |
+| POST | `/api/customer-portal/messages/read-all` | 一键标记当前客户联系人所有门户消息已读 |
+| POST | `/api/customer-portal/tasks` | 客户创建任务；项目必选，标题/描述必填，自动分配给客户技术支持负责人并写入通知事件 |
+| POST | `/api/customer-portal/tasks/{id}/comments` | 客户在门户中新增任务留言；默认写入外部留言，Kozen 内部任务详情同步可见 |
+
+> 说明：客户门户验证码使用 Redis/Valkey 临时存储，10 分钟过期，不使用数据库验证码表。客户门户 token 默认 8 小时，并通过响应头 `X-KPM-Refresh-Token` 实现滑动续期。
+
 ## 任务服务 `/api/tasks`
 
 | 方法 | 路径 | 说明 |
@@ -81,7 +102,7 @@
 | POST | `/api/tasks` | 新建任务 |
 | PUT | `/api/tasks/{id}` | 修改任务；任务完成/拒绝时同步关联需求状态 |
 | DELETE | `/api/tasks/{id}` | 删除任务 |
-| POST | `/api/tasks/{id}/comments` | 新增任务评论 |
+| POST | `/api/tasks/{id}/comments` | 新增任务评论，`commentType=internal/external`；内部用户发布外部留言时会同步客户门户消息并写入邮件 outbox |
 | POST | `/api/tasks/{id}/attachments` | 新增任务附件记录 |
 
 ## 订单服务 `/api/orders`

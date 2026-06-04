@@ -8,12 +8,21 @@ import com.kozen.kpm.customer.converter.CustomerConverter;
 import com.kozen.kpm.customer.dto.CustomerContactRequest;
 import com.kozen.kpm.customer.dto.CustomerDto;
 import com.kozen.kpm.customer.dto.CustomerFollowupRequest;
+import com.kozen.kpm.customer.dto.CustomerNotificationRequest;
+import com.kozen.kpm.customer.dto.CustomerNotificationResultDto;
 import com.kozen.kpm.customer.dto.CustomerRequest;
 import com.kozen.kpm.customer.dto.CustomerWriteCommand;
+import com.kozen.kpm.customer.entity.CustomerContactEntity;
 import com.kozen.kpm.customer.entity.CustomerEntity;
 import com.kozen.kpm.customer.entity.UserLookupEntity;
 import com.kozen.kpm.customer.mapper.CustomerMapper;
+import com.kozen.kpm.customer.portal.config.CustomerPortalProperties;
 import com.kozen.kpm.customer.service.CustomerService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,12 +31,23 @@ import java.util.List;
 /** Default customer service implementation with typed DTO/entity boundaries. */
 @Service
 public class CustomerServiceImpl implements CustomerService {
+    private static final Logger log = LoggerFactory.getLogger(CustomerServiceImpl.class);
+
     private final CustomerMapper customerMapper;
     private final CustomerConverter customerConverter;
+    private final CustomerPortalProperties customerPortalProperties;
+    private final JavaMailSender mailSender;
 
-    public CustomerServiceImpl(CustomerMapper customerMapper, CustomerConverter customerConverter) {
+    public CustomerServiceImpl(
+            CustomerMapper customerMapper,
+            CustomerConverter customerConverter,
+            CustomerPortalProperties customerPortalProperties,
+            ObjectProvider<JavaMailSender> mailSenderProvider
+    ) {
         this.customerMapper = customerMapper;
         this.customerConverter = customerConverter;
+        this.customerPortalProperties = customerPortalProperties;
+        this.mailSender = mailSenderProvider.getIfAvailable();
     }
 
     @Override
@@ -108,6 +128,36 @@ public class CustomerServiceImpl implements CustomerService {
         return detail(id);
     }
 
+
+    @Override
+    @Transactional
+    public CustomerNotificationResultDto sendNotification(String id, CustomerNotificationRequest request, String publisher) {
+        CustomerEntity customer = requireCustomer(id);
+        String title = ValidationUtil.requireText(request.title(), "通知标题", 120);
+        String content = ValidationUtil.requireText(request.content(), "通知内容", 3000);
+        String publisherName = ValidationUtil.optionalText(publisher, "发布人", 80);
+        if (publisherName == null || publisherName.isBlank()) {
+            publisherName = "KPM";
+        }
+        List<CustomerContactEntity> contacts = customerMapper.contacts(id).stream()
+                .filter(contact -> contact.email() != null && !contact.email().isBlank())
+                .toList();
+        if (contacts.isEmpty()) {
+            throw new IllegalArgumentException("该客户没有配置可通知的联系人邮箱");
+        }
+        String messageTitle = "客户通知：" + title;
+        int portalMessageCount = 0;
+        int emailAttemptCount = 0;
+        for (CustomerContactEntity contact : contacts) {
+            customerMapper.insertCustomerPortalNotification(id, contact.id(), contact.email(), messageTitle, content, publisherName);
+            portalMessageCount += 1;
+            if (sendCustomerNotificationMail(customer, contact, title, content, publisherName)) {
+                emailAttemptCount += 1;
+            }
+        }
+        return new CustomerNotificationResultDto(id, contacts.size(), portalMessageCount, emailAttemptCount);
+    }
+
     private String resolveDefault(Object value, String enumType, String label) {
         if (value != null && !String.valueOf(value).isBlank()) {
             return String.valueOf(value);
@@ -144,6 +194,29 @@ public class CustomerServiceImpl implements CustomerService {
         for (String owner : request.safeSupportOwners()) {
             UserLookupEntity user = requireUser(owner, "负责技术支持");
             customerMapper.insertOwner(IdUtil.nanoId("co"), customerId, "support", user.getId(), user.getName());
+        }
+    }
+
+
+    private boolean sendCustomerNotificationMail(CustomerEntity customer, CustomerContactEntity contact, String title, String content, String publisher) {
+        if (!customerPortalProperties.isMailEnabled() || mailSender == null) {
+            return false;
+        }
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(customerPortalProperties.getMailFrom());
+            message.setTo(contact.email());
+            message.setSubject("KPM 客户通知：" + title);
+            message.setText("您好 " + contact.name() + "，\n\n"
+                    + "Kozen 向 " + customer.getName() + " 发布了一条通知：\n\n"
+                    + content + "\n\n"
+                    + "发布人：" + publisher + "\n"
+                    + "Kozen Project Management");
+            mailSender.send(message);
+            return true;
+        } catch (Exception e) {
+            log.warn("Failed to send customer notification mail to {}: {}", contact.email(), e.getMessage());
+            return false;
         }
     }
 

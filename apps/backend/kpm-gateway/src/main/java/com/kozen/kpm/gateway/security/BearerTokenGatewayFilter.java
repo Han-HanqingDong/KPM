@@ -17,6 +17,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -34,7 +35,10 @@ public class BearerTokenGatewayFilter implements GlobalFilter, Ordered {
 
     private final boolean enabled;
     private final boolean rbacEnabled;
+    private static final String REFRESH_TOKEN_HEADER = "X-KPM-Refresh-Token";
+
     private final String tokenSecret;
+    private final long tokenTtlSeconds;
     private final String iamUri;
     private final WebClient webClient;
 
@@ -42,11 +46,13 @@ public class BearerTokenGatewayFilter implements GlobalFilter, Ordered {
             @Value("${kpm.auth.enabled:true}") boolean enabled,
             @Value("${kpm.auth.rbac-enabled:true}") boolean rbacEnabled,
             @Value("${kpm.auth.token-secret:" + AuthTokenUtil.DEFAULT_SECRET + "}") String tokenSecret,
+            @Value("${kpm.auth.token-ttl-seconds:7200}") long tokenTtlSeconds,
             @Value("${kpm.iam.uri:${KPM_IAM_URI:http://localhost:8101}}") String iamUri
     ) {
         this.enabled = enabled;
         this.rbacEnabled = rbacEnabled;
         this.tokenSecret = tokenSecret;
+        this.tokenTtlSeconds = tokenTtlSeconds;
         this.iamUri = trimTrailingSlash(iamUri);
         this.webClient = WebClient.builder().build();
     }
@@ -71,10 +77,15 @@ public class BearerTokenGatewayFilter implements GlobalFilter, Ordered {
         }
 
         String account = String.valueOf(claims.get("account"));
+        String displayName = String.valueOf(claims.get("name"));
+        exchange.getResponse().getHeaders().set(REFRESH_TOKEN_HEADER, AuthTokenUtil.issue(account, displayName, tokenTtlSeconds, tokenSecret));
         ServerWebExchange forwarded = exchange.mutate()
                 .request(builder -> builder
                         .header("X-KPM-Account", account)
-                        .header("X-KPM-User", String.valueOf(claims.get("name"))))
+                        .header("X-KPM-User", displayName)
+                        .header("X-KPM-User-Name-Base64", Base64.getUrlEncoder()
+                                .withoutPadding()
+                                .encodeToString(displayName.getBytes(StandardCharsets.UTF_8))))
                 .build();
 
         String requiredPermission = requiredPermission(path, exchange.getRequest().getMethod());
@@ -98,6 +109,7 @@ public class BearerTokenGatewayFilter implements GlobalFilter, Ordered {
         return path == null
                 || !path.startsWith("/api/")
                 || path.equals("/api/iam/login")
+                || path.startsWith("/api/customer-portal/")
                 || path.startsWith("/actuator/")
                 || path.startsWith("/v3/api-docs")
                 || path.startsWith("/swagger-ui");
@@ -195,6 +207,9 @@ public class BearerTokenGatewayFilter implements GlobalFilter, Ordered {
             if (path.matches("/api/projects/[^/]+/archive")) return "button:projects:archive";
             if (path.matches("/api/projects/stages/[^/]+/records")) return "button:stage-detail:publish-record";
             if (path.matches("/api/projects/stages/[^/]+/materials")) return "button:stage-detail:publish-file";
+            if (path.matches("/api/projects/[^/]+/materials") && "POST".equals(verb)) return "button:project-materials:upload";
+            if (path.matches("/api/projects/[^/]+/materials/[^/]+/public")) return "button:project-materials:publish-customer";
+            if (path.matches("/api/projects/[^/]+/announcements")) return "button:project-detail:publish-announcement";
             if (path.matches("/api/projects/stage-materials/[^/]+/publish")) return "button:stage-detail:publish-file";
             if (path.matches("/api/projects/[^/]+/customers/[^/]+/requirements")) return "button:requirements:save";
             if (path.matches("/api/projects/requirements/[^/]+/void")) return "button:requirements:void";

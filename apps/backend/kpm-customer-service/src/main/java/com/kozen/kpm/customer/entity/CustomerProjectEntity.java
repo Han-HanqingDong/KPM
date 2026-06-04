@@ -8,7 +8,6 @@ public class CustomerProjectEntity {
     private String externalName;
     private String internalName;
     private String modelName;
-    private String salesability;
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
@@ -22,6 +21,4 @@ public class CustomerProjectEntity {
     public void setInternalName(String internalName) { this.internalName = internalName; }
     public String getModelName() { return modelName; }
     public void setModelName(String modelName) { this.modelName = modelName; }
-    public String getSalesability() { return salesability; }
-    public void setSalesability(String salesability) { this.salesability = salesability; }
 }

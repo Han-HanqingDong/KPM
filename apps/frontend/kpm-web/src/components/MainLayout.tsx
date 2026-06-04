@@ -1,8 +1,10 @@
 import { BellOutlined, DashboardOutlined, DatabaseOutlined, FileTextOutlined, LineChartOutlined, MenuFoldOutlined, MenuUnfoldOutlined, ProjectOutlined, ShopOutlined, TeamOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import { Avatar, Badge, Button, Dropdown, Layout, Menu, Space, Typography, message } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { KozenLogo } from './KozenLogo';
+import { LanguageSwitch } from './LanguageSwitch';
 import { useAuth } from '../context/AuthContext';
 import { kpmApi } from '../services/kpmApi';
 import type { AnyRecord } from '../types';
@@ -28,6 +30,7 @@ const navItems = [
 
 export function MainLayout() {
   const { user, logout, can } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('kpm.react.sidebarCollapsed') === 'true');
@@ -91,10 +94,13 @@ export function MainLayout() {
         <div className="kpm-user-foot">
           <Dropdown
             trigger={['click']}
+            placement={collapsed ? 'top' : 'topLeft'}
+            overlayClassName="kpm-user-dropdown"
+            getPopupContainer={() => document.body}
             menu={{
               items: [
-                { key: 'change', label: '修改密码' },
-                { key: 'logout', label: '退出登录' },
+                { key: 'change', label: t('nav.changePassword') },
+                { key: 'logout', label: t('nav.logout') },
               ],
               onClick: ({ key }) => {
                 if (key === 'logout') logout();
@@ -102,9 +108,13 @@ export function MainLayout() {
               },
             }}
           >
-            <button className="kpm-user-trigger" type="button">
-              <Avatar src={`https://api.dicebear.com/10.x/adventurer/svg?seed=${encodeURIComponent(user?.account || 'kozen')}&backgroundColor=fff35a,b7ff38,1fd7c7`} />
-              <span>{user?.name || '未登录'}</span>
+            <button className="kpm-user-trigger" type="button" title={user?.name || '未登录'}>
+              <Avatar
+                className="kpm-user-avatar"
+                size={collapsed ? 44 : 38}
+                src={`https://api.dicebear.com/10.x/adventurer/svg?seed=${encodeURIComponent(user?.account || 'kozen')}&backgroundColor=fff35a,b7ff38,1fd7c7`}
+              />
+              {!collapsed && <span className="kpm-user-name">{user?.name || '未登录'}</span>}
             </button>
           </Dropdown>
         </div>
@@ -115,13 +125,14 @@ export function MainLayout() {
             <strong>KOZEN</strong>
             <span>TO COLLABORATE WITH GLOBAL LEADERS</span>
           </div>
+          <LanguageSwitch />
           <Dropdown
             trigger={['click']}
-            dropdownRender={() => (
+            popupRender={() => (
               <div className="kpm-message-panel">
                 <div className="kpm-message-head">
-                  <strong>消息盒子</strong>
-                  <Button size="small" onClick={markAllRead}>一键已读</Button>
+                  <strong>{t('nav.messageBox')}</strong>
+                  <Button size="small" onClick={markAllRead}>{t('nav.markAllRead')}</Button>
                 </div>
                 {messages.length ? messages.map((item) => (
                   <article key={item.id} className={item.readFlag ? 'read' : ''}>
@@ -129,12 +140,12 @@ export function MainLayout() {
                     <p>{item.content || '-'}</p>
                     <small>{dateTimeText(item.createdAt)}</small>
                   </article>
-                )) : <p className="kpm-empty-text">暂无消息</p>}
+                )) : <p className="kpm-empty-text">{t('nav.noMessages')}</p>}
               </div>
             )}
           >
             <Button icon={<BellOutlined />}>
-              <Space>消息<Badge count={unread} /></Space>
+              <Space>{t('nav.messages')}<Badge count={unread} /></Space>
             </Button>
           </Dropdown>
         </header>

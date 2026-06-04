@@ -27,6 +27,7 @@ export function FullscreenView({ title, triggerText = '全屏查看', children, 
         centered
         destroyOnHidden
         className="kpm-fullscreen-modal"
+        zIndex={1400}
       >
         <div className="kpm-fullscreen-body">
           {fullscreenChildren || children}

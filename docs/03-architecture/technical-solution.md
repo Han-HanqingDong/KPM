@@ -160,7 +160,7 @@ flowchart LR
 | --- | --- | --- |
 | `kpm-gateway` | API routing, authentication entry, rate limiting, request tracing | No business data. Routes web/API traffic to backend services. |
 | `kpm-iam-service` | users, departments, roles, permissions, login identity mapping, effective permission calculation | Departments are flat in V1; users can belong to multiple departments; permissions are role grants + direct user grants. |
-| `kpm-resource-service` | configurable enums and business configuration catalogs | Customer level, customer-project status, order type, task category, task status, task transitions, salesability reasons. |
+| `kpm-resource-service` | configurable enums and business configuration catalogs | Customer level, customer-project status, order type, order status, task category, task status, task transitions. Project salesability has been removed from the current scope. |
 | `kpm-project-service` | projects, workflow templates, project stages, stage owners, stage files/messages metadata, project materials, project-customer relationship, requirements | This is the core product-lifecycle service. It owns stage status and derived project status. |
 | `kpm-customer-service` | customer master data, contacts, customer materials, follow-up records, sales/support owner relationships | Customer-project relation status belongs to project service because it is project-contextual. |
 | `kpm-task-service` | tasks, task status transitions, task comments, participants, assignees, task attachments metadata | Owns task lifecycle and emits task outcome events. |
@@ -491,7 +491,7 @@ Production target:
 8. Every write API should be idempotency-aware when retries are possible.
 9. Add database indexes based on actual query patterns, especially:
    - project external/internal/model name
-   - project status/salesability
+   - project archived flag, manager, external/internal/model name, and stage status through stage tables
    - customer name/region/level/owner
    - task status/category/assignee/participant/project/customer
    - order date/customer/project/region/order type

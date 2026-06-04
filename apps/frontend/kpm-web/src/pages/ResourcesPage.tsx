@@ -14,9 +14,6 @@ import { includesKeyword } from '../utils/format';
 import { validationRules } from '../validation';
 
 const enumTypeOptions = [
-  { label: '项目状态 project_status', value: 'project_status' },
-  { label: '可销售状态 salesability', value: 'salesability' },
-  { label: '不可销售原因 unsellable_reason', value: 'unsellable_reason' },
   { label: '阶段状态 stage_status', value: 'stage_status' },
   { label: '客户状态 customer_master_status', value: 'customer_master_status' },
   { label: '客户等级 customer_level', value: 'customer_level' },

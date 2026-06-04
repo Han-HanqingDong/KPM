@@ -5,6 +5,7 @@ public record FileUploadResult(
         String fileName,
         String type,
         String fileType,
+        String fileSize,
         String size,
         long bytes,
         String contentType,

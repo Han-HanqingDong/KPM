@@ -10,10 +10,7 @@ public class ProjectEntity {
     private String modelName;
     private String managerUserId;
     private String managerAccount;
-    private String status;
     private Boolean archived;
-    private String salesability;
-    private String unsellableReason;
     private String description;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -30,14 +27,8 @@ public class ProjectEntity {
     public void setManagerUserId(String managerUserId) { this.managerUserId = managerUserId; }
     public String getManagerAccount() { return managerAccount; }
     public void setManagerAccount(String managerAccount) { this.managerAccount = managerAccount; }
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
     public Boolean getArchived() { return archived; }
     public void setArchived(Boolean archived) { this.archived = archived; }
-    public String getSalesability() { return salesability; }
-    public void setSalesability(String salesability) { this.salesability = salesability; }
-    public String getUnsellableReason() { return unsellableReason; }
-    public void setUnsellableReason(String unsellableReason) { this.unsellableReason = unsellableReason; }
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
     public LocalDateTime getCreatedAt() { return createdAt; }

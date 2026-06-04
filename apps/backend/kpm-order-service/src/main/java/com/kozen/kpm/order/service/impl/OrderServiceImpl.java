@@ -10,6 +10,7 @@ import com.kozen.kpm.order.dto.OrderRequest;
 import com.kozen.kpm.order.dto.OrderSkuSnapshotDto;
 import com.kozen.kpm.order.dto.OrderWriteCommand;
 import com.kozen.kpm.order.entity.OrderEntity;
+import com.kozen.kpm.order.entity.OrderHistoryEntity;
 import com.kozen.kpm.order.entity.ProjectSkuEntity;
 import com.kozen.kpm.order.entity.UserLookupEntity;
 import com.kozen.kpm.order.mapper.OrderMapper;
@@ -20,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /** Default order service implementation. */
 @Service
@@ -37,8 +40,17 @@ public class OrderServiceImpl implements OrderService {
         String y = SqlParamUtil.blankIfAll(year);
         String c = SqlParamUtil.blankIfAll(customerId);
         String p = SqlParamUtil.blankIfAll(projectId);
-        return orderMapper.list(y, c, p).stream()
-                .map(this::toDtoWithHistories)
+        DateRange range = orderDateRange(y);
+        List<OrderEntity> orders = orderMapper.list(range.startDate(), range.endDate(), c, p);
+        if (orders.isEmpty()) {
+            return List.of();
+        }
+        Map<String, List<OrderHistoryEntity>> histories = orderMapper.historiesForOrders(
+                        orders.stream().map(OrderEntity::getId).toList()
+                ).stream()
+                .collect(Collectors.groupingBy(OrderHistoryEntity::getOrderId));
+        return orders.stream()
+                .map(order -> orderConverter.toOrderDto(order, histories.getOrDefault(order.getId(), List.of())))
                 .toList();
     }
 
@@ -275,4 +287,17 @@ public class OrderServiceImpl implements OrderService {
     private String nextOrderId() {
         return IdUtil.numericId();
     }
+
+    private DateRange orderDateRange(String year) {
+        if (year == null || year.isBlank()) {
+            return new DateRange(null, null);
+        }
+        if (!year.matches("\\d{4}")) {
+            throw new IllegalArgumentException("年份格式不正确，应为4位年份");
+        }
+        LocalDate start = LocalDate.of(Integer.parseInt(year), 1, 1);
+        return new DateRange(start, start.plusYears(1));
+    }
+
+    private record DateRange(LocalDate startDate, LocalDate endDate) {}
 }

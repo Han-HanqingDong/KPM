@@ -12,6 +12,7 @@ public class ProjectFileEntity {
     private String fileName;
     private String fileType;
     private String fileSize;
+    private String description;
     private String uploader;
     private String bucket;
     private String objectKey;
@@ -19,8 +20,10 @@ public class ProjectFileEntity {
     private String storageCategory;
     private String shareTarget;
     private Boolean publishedToProject;
+    private Boolean publicVisible;
     private LocalDateTime uploadedAt;
     private LocalDateTime publishedAt;
+    private LocalDateTime publicAt;
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
@@ -38,6 +41,8 @@ public class ProjectFileEntity {
     public void setFileType(String fileType) { this.fileType = fileType; }
     public String getFileSize() { return fileSize; }
     public void setFileSize(String fileSize) { this.fileSize = fileSize; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
     public String getUploader() { return uploader; }
     public void setUploader(String uploader) { this.uploader = uploader; }
     public String getBucket() { return bucket; }
@@ -52,8 +57,12 @@ public class ProjectFileEntity {
     public void setShareTarget(String shareTarget) { this.shareTarget = shareTarget; }
     public Boolean getPublishedToProject() { return publishedToProject; }
     public void setPublishedToProject(Boolean publishedToProject) { this.publishedToProject = publishedToProject; }
+    public Boolean getPublicVisible() { return publicVisible; }
+    public void setPublicVisible(Boolean publicVisible) { this.publicVisible = publicVisible; }
     public LocalDateTime getUploadedAt() { return uploadedAt; }
     public void setUploadedAt(LocalDateTime uploadedAt) { this.uploadedAt = uploadedAt; }
     public LocalDateTime getPublishedAt() { return publishedAt; }
     public void setPublishedAt(LocalDateTime publishedAt) { this.publishedAt = publishedAt; }
+    public LocalDateTime getPublicAt() { return publicAt; }
+    public void setPublicAt(LocalDateTime publicAt) { this.publicAt = publicAt; }
 }

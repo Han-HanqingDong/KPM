@@ -155,13 +155,56 @@ kpm:
     code: ${code}
   auth:
     token-secret: ${AUTH_SECRET}
+    token-ttl-seconds: ${KPM_AUTH_TOKEN_TTL_SECONDS:-7200}
 YAML
 }
 
 publish kpm-iam-service.yaml "$(base_config 8101 iam)"
 publish kpm-resource-service.yaml "$(base_config 8102 resource)"
 publish kpm-project-service.yaml "$(base_config 8103 project)"
-publish kpm-customer-service.yaml "$(base_config 8104 customer)"
+publish kpm-customer-service.yaml "$(cat <<YAML
+server:
+  port: 8104
+spring:
+  data:
+    redis:
+      host: ${KPM_VALKEY_HOST:-valkey}
+      port: ${KPM_VALKEY_PORT:-6379}
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?stringtype=unspecified
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${KPM_DB_POOL_MAX_SIZE:-5}
+      minimum-idle: ${KPM_DB_POOL_MIN_IDLE:-1}
+  mail:
+    host: ${KPM_MAIL_HOST:-}
+    port: ${KPM_MAIL_PORT:-587}
+    username: ${KPM_MAIL_USERNAME:-}
+    password: ${KPM_MAIL_PASSWORD:-}
+    properties:
+      mail:
+        smtp:
+          auth: ${KPM_MAIL_SMTP_AUTH:-true}
+          starttls:
+            enable: ${KPM_MAIL_STARTTLS_ENABLE:-true}
+management:
+  health:
+    mail:
+      enabled: ${KPM_CUSTOMER_PORTAL_MAIL_HEALTH_ENABLED:-${KPM_CUSTOMER_PORTAL_MAIL_ENABLED:-false}}
+kpm:
+  service:
+    code: customer
+  auth:
+    token-secret: ${AUTH_SECRET}
+  customer-portal:
+    code-ttl-seconds: ${KPM_CUSTOMER_PORTAL_CODE_TTL_SECONDS:-600}
+    token-ttl-seconds: ${KPM_CUSTOMER_PORTAL_TOKEN_TTL_SECONDS:-28800}
+    otp-debug-enabled: ${KPM_CUSTOMER_PORTAL_OTP_DEBUG_ENABLED:-true}
+    mail-enabled: ${KPM_CUSTOMER_PORTAL_MAIL_ENABLED:-false}
+    mail-from: ${KPM_CUSTOMER_PORTAL_MAIL_FROM:-noreply@kozen.example}
+YAML
+)"
 publish kpm-task-service.yaml "$(base_config 8105 task)"
 publish kpm-order-service.yaml "$(base_config 8106 order)"
 publish kpm-integration-service.yaml "$(cat <<YAML
@@ -241,7 +284,51 @@ spring:
                   - "*"
                 exposedHeaders:
                   - Authorization
+                  - X-KPM-Refresh-Token
                 allowCredentials: false
+          default-filters:
+            - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials Access-Control-Allow-Methods Access-Control-Allow-Headers Access-Control-Expose-Headers RETAIN_FIRST
+          routes:
+            - id: iam
+              uri: lb://kpm-iam-service
+              predicates:
+                - Path=/api/iam/**
+            - id: resources
+              uri: lb://kpm-resource-service
+              predicates:
+                - Path=/api/resources/**
+            - id: projects
+              uri: lb://kpm-project-service
+              predicates:
+                - Path=/api/projects/**
+            - id: customers
+              uri: lb://kpm-customer-service
+              predicates:
+                - Path=/api/customers/**,/api/customer-portal/**
+            - id: tasks
+              uri: lb://kpm-task-service
+              predicates:
+                - Path=/api/tasks/**
+            - id: orders
+              uri: lb://kpm-order-service
+              predicates:
+                - Path=/api/orders/**
+            - id: files
+              uri: lb://kpm-file-service
+              predicates:
+                - Path=/api/files/**
+            - id: analytics
+              uri: lb://kpm-analytics-service
+              predicates:
+                - Path=/api/analytics/**
+            - id: integrations
+              uri: lb://kpm-integration-service
+              predicates:
+                - Path=/api/integrations/**
+            - id: notifications
+              uri: lb://kpm-notification-service
+              predicates:
+                - Path=/api/notifications/**
 kpm:
   iam:
     uri: ${KPM_IAM_URI:-http://kpm-iam-service-dev:8101}
@@ -249,6 +336,7 @@ kpm:
     enabled: ${KPM_AUTH_ENABLED:-true}
     rbac-enabled: ${KPM_RBAC_ENABLED:-true}
     token-secret: ${AUTH_SECRET}
+    token-ttl-seconds: ${KPM_AUTH_TOKEN_TTL_SECONDS:-7200}
 YAML
 )"
 

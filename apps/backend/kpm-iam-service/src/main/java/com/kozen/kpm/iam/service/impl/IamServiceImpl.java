@@ -33,7 +33,7 @@ public class IamServiceImpl implements IamService {
             IamMapper iamMapper,
             IamUserConverter iamUserConverter,
             @Value("${kpm.auth.token-secret:" + AuthTokenUtil.DEFAULT_SECRET + "}") String tokenSecret,
-            @Value("${kpm.auth.token-ttl-seconds:28800}") long tokenTtlSeconds
+            @Value("${kpm.auth.token-ttl-seconds:7200}") long tokenTtlSeconds
     ) {
         this.iamMapper = iamMapper;
         this.iamUserConverter = iamUserConverter;

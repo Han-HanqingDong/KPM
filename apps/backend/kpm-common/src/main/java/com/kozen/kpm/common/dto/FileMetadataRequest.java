@@ -13,6 +13,8 @@ public record FileMetadataRequest(
         String fileType,
         @Size(max = 64, message = "文件大小不能超过64个字符")
         String fileSize,
+        @Size(max = 1000, message = "文件描述不能超过1000个字符")
+        String description,
         @NotBlank(message = "上传人不能为空")
         @Size(max = 64, message = "上传人不能超过64个字符")
         String uploader,

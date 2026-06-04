@@ -1,0 +1,165 @@
+{
+  "timestamp": "2026-06-05T00:36:20",
+  "baseUrl": "http://127.0.0.1:8080",
+  "prefix": "IT05003613",
+  "summary": {
+    "passed": 17,
+    "failed": 0,
+    "total": 17
+  },
+  "results": [
+    {
+      "case_id": "IAM-001",
+      "module": "身份",
+      "title": "管理员登录",
+      "status": "PASS",
+      "detail": "admin=admin@kozenmobile.com",
+      "endpoint": "POST /api/iam/login",
+      "frontend_action": "登录按钮"
+    },
+    {
+      "case_id": "SVC-001",
+      "module": "服务",
+      "title": "所有服务健康接口",
+      "status": "PASS",
+      "detail": "service endpoints=10",
+      "endpoint": "GET /api/*/ping",
+      "frontend_action": ""
+    },
+    {
+      "case_id": "RES-001",
+      "module": "资源",
+      "title": "部门/角色/用户新增并落库",
+      "status": "PASS",
+      "detail": "dept=178059097339300005 role=178059097340600006 user=178059097342800007",
+      "endpoint": "POST /api/resources/*",
+      "frontend_action": "资源管理新增按钮"
+    },
+    {
+      "case_id": "RES-002",
+      "module": "资源",
+      "title": "部门/角色/用户修改和重置密码",
+      "status": "PASS",
+      "detail": "resource update/reset ok",
+      "endpoint": "PUT/POST /api/resources/*",
+      "frontend_action": "资源管理编辑/重置按钮"
+    },
+    {
+      "case_id": "IAM-002",
+      "module": "身份",
+      "title": "当前用户、修改密码、登录校验",
+      "status": "PASS",
+      "detail": "me/change-password/login-validation ok",
+      "endpoint": "GET /api/iam/me; POST /api/iam/change-password",
+      "frontend_action": "左下角修改密码入口"
+    },
+    {
+      "case_id": "RES-003",
+      "module": "资源",
+      "title": "枚举和任务状态流转 CRUD",
+      "status": "PASS",
+      "detail": "enum=178059097385900008 transition=178059097388100009",
+      "endpoint": "POST/PUT/DELETE /api/resources/enums; /task-status-transitions",
+      "frontend_action": "枚举/流转按钮"
+    },
+    {
+      "case_id": "TPL-001",
+      "module": "模板",
+      "title": "流程模板新增修改查询",
+      "status": "PASS",
+      "detail": "template=178059097401300028",
+      "endpoint": "GET/POST/PUT /api/projects/templates",
+      "frontend_action": "流程模板按钮"
+    },
+    {
+      "case_id": "PROJ-001",
+      "module": "项目客户",
+      "title": "项目、阶段、SKU、客户、关联客户全链路",
+      "status": "PASS",
+      "detail": "project=178059097411900034 customer=178059097430400008 sku=178059097426700048",
+      "endpoint": "POST/PUT /api/projects; /customers; /skus",
+      "frontend_action": "项目/客户/SKU按钮"
+    },
+    {
+      "case_id": "CUST-001",
+      "module": "客户",
+      "title": "联系人、客户资料、跟进记录",
+      "status": "PASS",
+      "detail": "contact=178059097482700013 file=KPM/customer/materials/178059097430400008/2026/06/04/df483a00-4906-4d34-b18c-81967299d2d7-kpm-IT05003613-customer.txt",
+      "endpoint": "POST /api/customers/{id}/contacts|materials|followups",
+      "frontend_action": "客户详情按钮"
+    },
+    {
+      "case_id": "PROJ-002",
+      "module": "项目",
+      "title": "阶段资料、发布、阶段记录、需求",
+      "status": "PASS",
+      "detail": "requirement=178059097534400053 linkedTask=178059097534400054",
+      "endpoint": "POST /api/projects/stages/*; /requirements",
+      "frontend_action": "阶段详情/需求按钮"
+    },
+    {
+      "case_id": "PORTAL-001",
+      "module": "客户门户",
+      "title": "公告类型、客户通知、公开资料和门户登录",
+      "status": "PASS",
+      "detail": "portal projects=1 materials=1 messages=2",
+      "endpoint": "POST /api/projects/{id}/announcements; /api/customers/{id}/notifications; /api/customer-portal/*",
+      "frontend_action": "项目公告/客户通知/客户门户"
+    },
+    {
+      "case_id": "TASK-001",
+      "module": "任务",
+      "title": "任务新增修改附件评论",
+      "status": "PASS",
+      "detail": "task=178059097603100004 taskNo=KYRUR142",
+      "endpoint": "GET/POST/PUT /api/tasks",
+      "frontend_action": "任务管理/阶段任务按钮"
+    },
+    {
+      "case_id": "ORD-001",
+      "module": "订单",
+      "title": "订单新增修改历史和金额",
+      "status": "PASS",
+      "detail": "order=178059097653700003 amount=42.0",
+      "endpoint": "GET/POST/PUT /api/orders",
+      "frontend_action": "订单管理按钮"
+    },
+    {
+      "case_id": "ANA-001",
+      "module": "统计文件",
+      "title": "统计看板和文件下载地址",
+      "status": "PASS",
+      "detail": "ossReady=True downloadUrl=yes",
+      "endpoint": "GET /api/analytics/*; /api/files/*",
+      "frontend_action": "统计看板/下载按钮"
+    },
+    {
+      "case_id": "MSG-001",
+      "module": "消息",
+      "title": "消息查询和已读",
+      "status": "PASS",
+      "detail": "messages=11",
+      "endpoint": "GET/POST /api/notifications/*",
+      "frontend_action": "消息盒子按钮"
+    },
+    {
+      "case_id": "UI-001",
+      "module": "前端",
+      "title": "前端 kpmApi 按钮动作静态覆盖",
+      "status": "PASS",
+      "detail": "frontend kpmApi action lines=56",
+      "endpoint": "",
+      "frontend_action": "React kpmApi actions"
+    },
+    {
+      "case_id": "CLEAN-001",
+      "module": "清理",
+      "title": "删除接口和逻辑删除校验",
+      "status": "PASS",
+      "detail": "task_attachment,task,linked_requirement_task,requirement,order,sku,contact,project,customer,template,transition,enum,user,role,department",
+      "endpoint": "DELETE/POST archive endpoints",
+      "frontend_action": "删除/归档按钮"
+    }
+  ]
+}

@@ -46,9 +46,9 @@ def fail_case(case_id, module, title, error, priority='P1'):
 def skip_case(case_id, module, title, reason, priority='P2'):
     record(case_id, module, title, 'SKIP', reason, priority)
 
-def api(method, path, body=None, expect_success=True, timeout=30):
+def api(method, path, body=None, expect_success=True, timeout=30, headers=None):
     data = None
-    headers = {}
+    headers = dict(headers or {})
     if body is not None:
         data = json.dumps(body, ensure_ascii=False).encode('utf-8')
         headers['Content-Type'] = 'application/json'
@@ -58,6 +58,11 @@ def api(method, path, body=None, expect_success=True, timeout=30):
             payload = json.loads(resp.read().decode('utf-8'))
     except urllib.error.HTTPError as e:
         text = e.read().decode('utf-8', errors='ignore')
+        if not expect_success:
+            try:
+                return json.loads(text)
+            except Exception:
+                return {'success': False, 'code': f'HTTP_{e.code}', 'message': text}
         raise ApiFailure(f'{method} {path} HTTP {e.code}: {text}') from e
     except Exception as e:
         raise ApiFailure(f'{method} {path}: {e}') from e
@@ -278,12 +283,12 @@ def run():
             'description': '自动化测试项目',
             'members': [{'userAccount': 'wanggong', 'role': '硬件项目成员'}],
             'stages': [
-                {'name': '自动阶段A', 'status': '未开始', 'assignees': [{'type': 'user', 'account': 'zhangmin', 'name': '张敏'}]},
-                {'name': '自动阶段B', 'status': '未开始', 'assignees': [{'type': 'user', 'account': 'wanggong', 'name': '王工'}]},
+                {'name': '自动阶段A', 'assignees': [{'type': 'user', 'account': 'zhangmin', 'name': '张敏'}]},
+                {'name': '自动阶段B', 'assignees': [{'type': 'user', 'account': 'wanggong', 'name': '王工'}]},
             ]
         })
         cleanup.append(('project', project['id']))
-        assert project.get('status') == '未开始', project
+        assert 'status' not in project, project
         assert project.get('salesability') == '可销售', project
         assert project.get('unsellableReason') in (None, ''), project.get('unsellableReason')
         members = project.get('members', [])
@@ -292,22 +297,26 @@ def run():
         context['stage_a'] = project['stages'][0]
         context['stage_b'] = project['stages'][1]
         return f"project={project['id']} members={len(members)} stages={len(project['stages'])}"
-    try_case('PROJ-005/006/008/014', '项目', '新建项目默认未开始、可销售隐藏不可销售原因、负责人自动入成员', project_flow, 'P0')
+    try_case('PROJ-005/006/008/014', '项目', '新建项目不返回总体状态、可销售隐藏不可销售原因、负责人自动入成员', project_flow, 'P0')
 
     def project_stage_status_flow():
         p = context['project']
         st_a = context['stage_a']['id']
         st_b = context['stage_b']['id']
-        api('PUT', f'/api/projects/stages/{q(st_a)}', {'status': '进行中'})
+        denied = api('PUT', f'/api/projects/stages/{q(st_a)}', {'status': '进行中'}, expect_success=False, headers={'X-KPM-Account': 'wanggong'})
+        assert denied.get('success') is False, denied
+        api('PUT', f'/api/projects/stages/{q(st_a)}', {'status': '进行中'}, headers={'X-KPM-Account': 'zhangmin'})
         p1 = api('GET', f"/api/projects/{q(p['id'])}")
-        assert p1.get('status') == '进行中', p1.get('status')
-        api('PUT', f'/api/projects/stages/{q(st_a)}', {'status': '已完成'})
-        api('PUT', f'/api/projects/stages/{q(st_b)}', {'status': '已完成'})
+        assert 'status' not in p1, p1
+        assert next(s for s in p1['stages'] if s['id'] == st_a).get('status') == '进行中', p1['stages']
+        api('PUT', f'/api/projects/stages/{q(st_a)}', {'status': '已完成'}, headers={'X-KPM-Account': 'zhangmin'})
+        api('PUT', f'/api/projects/stages/{q(st_b)}', {'status': '已完成'}, headers={'X-KPM-Account': 'wanggong'})
         p2 = api('GET', f"/api/projects/{q(p['id'])}")
-        assert p2.get('status') == '已完成', p2.get('status')
+        assert next(s for s in p2['stages'] if s['id'] == st_a).get('status') == '已完成', p2['stages']
+        assert next(s for s in p2['stages'] if s['id'] == st_b).get('status') == '已完成', p2['stages']
         context['project'] = p2
-        return 'status auto sync ok'
-    try_case('PROJ-014/015/STAGE-002', '项目', '阶段状态驱动项目状态自动计算', project_stage_status_flow, 'P0')
+        return 'stage owner permission ok'
+    try_case('PROJ-014/015/STAGE-002', '项目', '阶段状态仅负责人可修改且项目无总体状态', project_stage_status_flow, 'P0')
 
     def project_material_flow():
         p = context['project']
@@ -510,7 +519,7 @@ def run():
             'unsellableReason': '设计测试中',
             'description': '订单状态联动项目',
             'members': [],
-            'stages': [{'name': '订单阶段', 'status': '未开始', 'assignees': []}],
+            'stages': [{'name': '订单阶段', 'assignees': []}],
         })
         cleanup.append(('project', p2['id']))
         o1 = api('POST', '/api/orders', {'orderDate': '2026-06-01', 'customerId': c2['id'], 'projectId': p2['id'], 'quantity': 1, 'specification': 'Sample', 'expectedShipDate': '2026-06-10', 'plannedShipDate': '2026-06-11', 'softwareVersion': 'v-sample', 'creator': 'Codex', 'orderType': '样品订单', 'currency': 'USD', 'unitPrice': '1'})

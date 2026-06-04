@@ -134,6 +134,20 @@ public interface CustomerMapper {
     @Insert("insert into kpm_customer_contacts (id, customer_id, name, title, phone, email, remark) values (#{id}, #{customerId}, #{request.name}, #{request.title}, #{request.phone}, #{request.email}, #{request.remark})")
     void insertContact(@Param("id") String id, @Param("customerId") String customerId, @Param("request") CustomerContactRequest request);
 
+    @Insert("""
+            insert into kpm_customer_portal_messages
+            (customer_id, contact_id, contact_email, title, content, message_type, creator)
+            values (#{customerId}, #{contactId}, lower(#{contactEmail}), #{title}, #{content}, 'customer_notification', #{publisher})
+            """)
+    void insertCustomerPortalNotification(
+            @Param("customerId") String customerId,
+            @Param("contactId") String contactId,
+            @Param("contactEmail") String contactEmail,
+            @Param("title") String title,
+            @Param("content") String content,
+            @Param("publisher") String publisher
+    );
+
     @Update("update kpm_customer_contacts set del_flag=1, update_time=current_timestamp where customer_id=#{customerId} and id=#{contactId}")
     void deleteContact(@Param("customerId") String customerId, @Param("contactId") String contactId);
 
@@ -184,8 +198,7 @@ public interface CustomerMapper {
                    p.id as projectId,
                    p.external_name as externalName,
                    p.internal_name as internalName,
-                   p.model_name as modelName,
-                   p.salesability
+                   p.model_name as modelName
             from kpm_project_customers pc join kpm_projects p on p.id = pc.project_id
             where pc.customer_id=#{customerId} and pc.del_flag=0 and p.del_flag=0 order by p.external_name
             """)

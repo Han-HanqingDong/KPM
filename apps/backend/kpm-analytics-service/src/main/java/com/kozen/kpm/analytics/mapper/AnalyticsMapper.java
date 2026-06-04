@@ -20,10 +20,11 @@ public interface AnalyticsMapper {
     Integer projectCount();
 
     @Select("""
-            select count(*)
+            select count(distinct p.id)
             from kpm_projects p
-            join kpm_enum_items e on e.enum_type='project_status' and e.value=p.status
-            where p.del_flag=0 and (coalesce(e.semantic, '') = 'ACTIVE' or p.status = '进行中')
+            join kpm_project_stages s on s.project_id=p.id and s.del_flag=0
+            left join kpm_enum_items e on e.enum_type='stage_status' and e.value=s.status and e.del_flag=0
+            where p.del_flag=0 and (coalesce(e.semantic, '') = 'ACTIVE' or s.status = '进行中')
             """)
     Integer activeProjectCount();
 
@@ -55,23 +56,52 @@ public interface AnalyticsMapper {
     List<OrderStatsRow> orderStats();
 
     @Select("""
-            select c.id as customer_id, c.name as customer_name, c.region, c.address, c.level, c.status,
-                   (select string_agg(distinct coalesce(u.name, co.owner_name), ', ')
-                    from kpm_customer_owners co
-                    left join kpm_users u on u.del_flag=0 and (u.id = co.owner_user_id or (co.owner_user_id is null and u.name = co.owner_name))
-                    where co.customer_id=c.id and co.owner_type='sales' and co.del_flag=0) as sales_owners,
-                   (select string_agg(distinct coalesce(u.name, co.owner_name), ', ')
-                    from kpm_customer_owners co
-                    left join kpm_users u on u.del_flag=0 and (u.id = co.owner_user_id or (co.owner_user_id is null and u.name = co.owner_name))
-                    where co.customer_id=c.id and co.owner_type='support' and co.del_flag=0) as support_owners,
-                   (select string_agg(distinct p.external_name, ', ')
-                    from kpm_project_customers pc
-                    join kpm_projects p on p.id=pc.project_id and p.del_flag=0
-                    where pc.customer_id=c.id and pc.del_flag=0) as projects,
-                   (select coalesce(sum(o.quantity), 0)
-                    from kpm_orders o
-                    where o.customer_id=c.id and o.del_flag=0) as ordered_quantity
+            with sales_owner as (
+                select co.customer_id,
+                       string_agg(distinct coalesce(u.name, co.owner_name), ', ') as sales_owners
+                from kpm_customer_owners co
+                left join kpm_users u on u.del_flag=0 and u.id = co.owner_user_id
+                where co.owner_type='sales' and co.del_flag=0
+                group by co.customer_id
+            ),
+            support_owner as (
+                select co.customer_id,
+                       string_agg(distinct coalesce(u.name, co.owner_name), ', ') as support_owners
+                from kpm_customer_owners co
+                left join kpm_users u on u.del_flag=0 and u.id = co.owner_user_id
+                where co.owner_type='support' and co.del_flag=0
+                group by co.customer_id
+            ),
+            project_agg as (
+                select pc.customer_id,
+                       string_agg(distinct p.external_name, ', ') as projects
+                from kpm_project_customers pc
+                join kpm_projects p on p.id=pc.project_id and p.del_flag=0
+                where pc.del_flag=0
+                group by pc.customer_id
+            ),
+            order_agg as (
+                select o.customer_id,
+                       coalesce(sum(o.quantity), 0) as ordered_quantity
+                from kpm_orders o
+                where o.del_flag=0
+                group by o.customer_id
+            )
+            select c.id as customer_id,
+                   c.name as customer_name,
+                   c.region,
+                   c.address,
+                   c.level,
+                   c.status,
+                   so.sales_owners,
+                   spo.support_owners,
+                   pa.projects,
+                   coalesce(oa.ordered_quantity, 0) as ordered_quantity
             from kpm_customers c
+            left join sales_owner so on so.customer_id=c.id
+            left join support_owner spo on spo.customer_id=c.id
+            left join project_agg pa on pa.customer_id=c.id
+            left join order_agg oa on oa.customer_id=c.id
             where c.del_flag=0
             order by c.region, c.name
             """)
@@ -114,19 +144,49 @@ public interface AnalyticsMapper {
     List<SupportStatsRow> support(@Param("customerId") String customerId);
 
     @Select("""
-            select c.id, c.name, c.region, c.level, c.status,
-                   max(cf.created_at) as last_followup_at,
-                   max(o.order_date) as last_order_date,
-                   count(distinct t.id) filter (where coalesce(ts.semantic, '普通') not in ('完成','拒绝')) as open_task_count,
-                   count(distinct pc.project_id) as project_count
+            with followup_agg as (
+                select customer_id, max(created_at) as last_followup_at
+                from kpm_customer_followups
+                where del_flag=0
+                group by customer_id
+            ),
+            order_agg as (
+                select customer_id, max(order_date) as last_order_date
+                from kpm_orders
+                where del_flag=0
+                group by customer_id
+            ),
+            open_task_agg as (
+                select t.customer_id,
+                       count(*) as open_task_count
+                from kpm_tasks t
+                left join kpm_enum_items ts on ts.enum_type='task_status' and ts.value=t.status and ts.del_flag=0
+                where t.del_flag=0
+                  and t.customer_id is not null
+                  and coalesce(ts.semantic, '普通') not in ('完成','拒绝')
+                group by t.customer_id
+            ),
+            project_agg as (
+                select customer_id, count(distinct project_id) as project_count
+                from kpm_project_customers
+                where del_flag=0
+                group by customer_id
+            )
+            select c.id,
+                   c.name,
+                   c.region,
+                   c.level,
+                   c.status,
+                   fa.last_followup_at,
+                   oa.last_order_date,
+                   coalesce(ota.open_task_count, 0) as open_task_count,
+                   coalesce(pa.project_count, 0) as project_count
             from kpm_customers c
-            left join kpm_customer_followups cf on cf.customer_id=c.id and cf.del_flag=0
-            left join kpm_orders o on o.customer_id=c.id and o.del_flag=0
-            left join kpm_tasks t on t.customer_id=c.id and t.del_flag=0
-            left join kpm_enum_items ts on ts.enum_type='task_status' and ts.value=t.status and ts.del_flag=0
-            left join kpm_project_customers pc on pc.customer_id=c.id and pc.del_flag=0
+            left join followup_agg fa on fa.customer_id=c.id
+            left join order_agg oa on oa.customer_id=c.id
+            left join open_task_agg ota on ota.customer_id=c.id
+            left join project_agg pa on pa.customer_id=c.id
             where c.del_flag=0
-            group by c.id, c.name, c.region, c.level, c.status
             order by c.name
             """)
     List<CustomerActivityRow> activity();

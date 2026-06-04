@@ -5,7 +5,6 @@ const projects = [
     internalName: 'R2351',
     modelName: 'K1352',
     managerAccount: 'wangwei',
-    status: '进行中',
     archived: false,
     salesability: '不可销售',
     unsellableReason: '仍处于设计或测试阶段',
@@ -47,7 +46,6 @@ const projects = [
     internalName: 'R2290',
     modelName: 'K1290',
     managerAccount: 'zhouhang',
-    status: '进行中',
     archived: false,
     salesability: '不可销售',
     unsellableReason: '仍处于设计或测试阶段',
@@ -74,7 +72,6 @@ const projects = [
     internalName: 'R2410',
     modelName: 'K1410',
     managerAccount: 'liuyang',
-    status: '已完成',
     archived: true,
     salesability: '不可销售',
     unsellableReason: '产品过老，不再继续推广',
@@ -104,7 +101,6 @@ const projects = [
     internalName: 'R2510',
     modelName: 'K1510',
     managerAccount: 'hejing',
-    status: '进行中',
     archived: false,
     salesability: '可销售',
     unsellableReason: '',
@@ -612,7 +608,6 @@ const prototypeNow = '2026-05-22 10:30';
 const prototypeReviewTime = '2026-05-22 11:20';
 const prototypeUploadTime = '2026-05-22 15:30';
 const taskCategoryOptions = ['需求', 'Bug', '技术支持', '其他'];
-const projectStatusOptions = ['未开始', '进行中', '已完成'];
 const stageStatusOptions = ['未开始', '进行中', '已完成'];
 const salesabilityOptions = ['可销售', '不可销售'];
 const unsellableReasonOptions = ['仍处于设计或测试阶段', '产品过老，不再继续推广', '被遗弃的老项目'];
@@ -879,7 +874,6 @@ function normalizeBackendProject(project = {}) {
     internalName: project.internalName || '-',
     modelName: project.modelName || '-',
     managerAccount: project.managerAccount || '',
-    status: project.status || '未开始',
     archived: Boolean(project.archived),
     salesability: project.salesability || '不可销售',
     unsellableReason: project.unsellableReason || '',
@@ -1086,7 +1080,6 @@ function hydrateOptionsFromBootstrap(bootstrap = {}) {
     to: item.toStatus,
   })));
   replaceArray(taskCategoryOptions, enumNames(enumItems, 'task_category', taskCategoryOptions));
-  replaceArray(projectStatusOptions, enumNames(enumItems, 'project_status', projectStatusOptions));
   replaceArray(stageStatusOptions, enumNames(enumItems, 'stage_status', stageStatusOptions));
   replaceArray(salesabilityOptions, enumNames(enumItems, 'salesability', salesabilityOptions));
   replaceArray(unsellableReasonOptions, enumNames(enumItems, 'unsellable_reason', unsellableReasonOptions));
@@ -1255,7 +1248,6 @@ async function hydrateFromBackend() {
 
 function renderAllPrototypeSurfaces() {
   ensureStageCollaborationData();
-  syncAllProjectStatusesFromStages();
   ensureTaskCollaborationData();
   ensureCustomerAndOrderData();
   renderDashboard();
@@ -3037,21 +3029,6 @@ function ongoingStageNames(project) {
   return project.stages.filter((stage) => stage.status === '进行中').map((stage) => stage.name);
 }
 
-function deriveProjectStatusFromStages(project) {
-  if (!project?.stages?.length) return '未开始';
-  if (project.stages.every((stage) => stage.status === '已完成')) return '已完成';
-  if (project.stages.some((stage) => stage.status === '进行中')) return '进行中';
-  return '未开始';
-}
-
-function syncProjectStatusFromStages(project) {
-  if (!project) return;
-  project.status = deriveProjectStatusFromStages(project);
-}
-
-function syncAllProjectStatusesFromStages() {
-  projects.forEach(syncProjectStatusFromStages);
-}
 
 function nextProjectId(externalName) {
   const base = externalName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'project';
@@ -3188,7 +3165,6 @@ function renderProjectTable(filter = '') {
       <td>${ongoingStageNames(project).map((name) => `<span class="badge progress">${name}</span>`).join(' ') || '<span class="badge pending">暂无进行中阶段</span>'}</td>
       <td>${projectManagerName(project)}</td>
       <td><span class="badge ${project.salesability === '可销售' ? 'done' : 'pending'}">${project.salesability}</span></td>
-      <td>${project.status}</td>
       <td><span class="badge ${project.archived ? 'pending' : 'done'}">${project.archived ? '已归档' : '未归档'}</span></td>
       <td class="row-actions">
         ${renderDirectRowAction('👁', '查看项目详情', `data-project-id="${escapeAttr(project.id)}"`)}
@@ -3307,7 +3283,6 @@ function renderProjectDetail() {
               <p>${project.internalName} / ${project.modelName}</p>
             </div>
             <div class="inline-actions">
-              <span class="badge ${badgeClass(project.status)}">${project.status}</span>
               <span class="badge ${project.archived ? 'pending' : 'done'}">${project.archived ? '已归档' : '未归档'}</span>
               <button class="ghost-btn" data-action="open-project-edit" data-project-id="${project.id}">编辑项目</button>
               <button class="${project.archived ? 'muted-btn' : 'danger-btn'}" data-action="request-project-archive" data-project-id="${project.id}">
@@ -3475,13 +3450,6 @@ function renderProjectEditContent(project) {
           <div class="form-field">
             <label>项目负责人</label>
             ${singleUserSearchInput('edit-project-manager', project.managerAccount, '输入姓名搜索项目负责人')}
-          </div>
-          <div class="form-field">
-            <label>项目状态</label>
-            <div class="derived-status-box">
-              <span class="badge ${badgeClass(project.status)}">${project.status}</span>
-              <small>由阶段状态自动计算：任一阶段进行中则项目进行中；全部阶段完成则项目已完成。</small>
-            </div>
           </div>
           <div class="form-field">
             <label>销售状态</label>
@@ -7599,7 +7567,6 @@ function createProjectWizardDraft() {
     internalName: '',
     modelName: '',
     managerAccount,
-    status: '未开始',
     salesability: salesabilityOptions[1],
     unsellableReason: unsellableReasonOptions[0],
     description: '',
@@ -7827,7 +7794,6 @@ function createProjectFromWizard() {
     internalName: projectWizardDraft.internalName || '-',
     modelName: projectWizardDraft.modelName || '-',
     managerAccount: projectWizardDraft.managerAccount,
-    status: '未开始',
     archived: false,
     salesability: projectWizardDraft.salesability,
     unsellableReason: projectWizardDraft.salesability === '可销售' ? '' : projectWizardDraft.unsellableReason,
@@ -7841,7 +7807,6 @@ function createProjectFromWizard() {
     projectCustomers: [],
     projectMaterials: [],
   };
-  syncProjectStatusFromStages(project);
 
   projects.unshift(project);
   selectedProjectId = project.id;
@@ -7876,13 +7841,6 @@ function renderWizard() {
         <div class="form-field">
           <label>项目负责人</label>
           ${singleUserSearchInput('wizard-project-manager', projectWizardDraft.managerAccount, '输入姓名搜索项目负责人')}
-        </div>
-        <div class="form-field">
-          <label>项目状态</label>
-          <div class="derived-status-box">
-            <span class="badge pending">未开始</span>
-            <small>新建项目默认为未开始；后续由阶段状态自动推导项目状态。</small>
-          </div>
         </div>
         <div class="form-field">
           <label>销售状态</label>
@@ -8058,7 +8016,6 @@ function backendProjectPayloadFromWizard() {
     members: members.map((member) => ({ userAccount: member.userAccount, role: member.role })),
     stages: template.stages.map((name) => ({
       name,
-      status: '未开始',
       assignees: cloneAssignees(projectWizardDraft.stageAssignments[name] || defaultAssigneesForStage(name)),
     })),
   };
@@ -10039,8 +9996,7 @@ document.addEventListener('click', async (event) => {
     project.stages.forEach((stage, index) => {
       stage.assignees = collectStageAssignees('edit', index);
     });
-    syncProjectStatusFromStages(project);
-    if (previousExternalName !== project.externalName) {
+      if (previousExternalName !== project.externalName) {
       tasks.filter((task) => task.project === previousExternalName).forEach((task) => {
         task.project = project.externalName;
       });
@@ -10702,8 +10658,7 @@ document.addEventListener('change', async (event) => {
   if (stageSelect) {
     const project = projects.find((item) => item.id === selectedProjectId);
     project.stages[Number(stageSelect.dataset.stageIndex)].status = stageSelect.value;
-    syncProjectStatusFromStages(project);
-    renderProjectDetail();
+      renderProjectDetail();
     renderProjectTable(projectSearch.value);
     renderDashboard();
   }

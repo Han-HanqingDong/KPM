@@ -16,6 +16,7 @@ import com.kozen.kpm.project.dto.ProjectDto;
 import com.kozen.kpm.project.dto.ProjectMemberRequest;
 import com.kozen.kpm.project.dto.ProjectMembersRequest;
 import com.kozen.kpm.project.dto.ProjectRequest;
+import com.kozen.kpm.project.dto.ProjectAnnouncementRequest;
 import com.kozen.kpm.project.dto.ProjectSkuDto;
 import com.kozen.kpm.project.dto.ProjectSkuRequest;
 import com.kozen.kpm.project.dto.ProjectSkuWriteCommand;
@@ -37,6 +38,7 @@ import com.kozen.kpm.project.entity.ProjectFileEntity;
 import com.kozen.kpm.project.entity.ProjectSkuEntity;
 import com.kozen.kpm.project.entity.ProjectStageEntity;
 import com.kozen.kpm.project.entity.RequirementEntity;
+import com.kozen.kpm.project.entity.StageAssigneeEntity;
 import com.kozen.kpm.project.entity.UserLookupEntity;
 import com.kozen.kpm.project.mapper.ProjectMapper;
 import com.kozen.kpm.project.service.ProjectService;
@@ -58,8 +60,8 @@ public class ProjectServiceImpl implements ProjectService {
     }
 
     @Override
-    public List<ProjectDto> list(String keyword, String salesability, Boolean archived) {
-        return projectMapper.list(keyword, salesability, archived).stream().map(this::enrichProject).toList();
+    public List<ProjectDto> list(String keyword, Boolean archived) {
+        return projectMapper.list(keyword, archived).stream().map(this::enrichProject).toList();
     }
 
     @Override
@@ -71,14 +73,10 @@ public class ProjectServiceImpl implements ProjectService {
     @Transactional
     public ProjectDto create(ProjectRequest request) {
         String id = uniqueProjectId(request.externalName());
-        String projectStatus = resolveDefault(request.status(), "project_status", "项目状态");
-        String salesability = resolveDefault(request.safeSalesability(), "salesability", "可销售状态");
-        String unsellableReason = "可销售".equals(salesability) ? null : request.unsellableReason();
         UserLookupEntity manager = requireUser(request.managerAccount(), "项目负责人");
-        projectMapper.insertProject(new ProjectWriteCommand(id, request.externalName(), request.internalName(), request.modelName(), manager.getId(), manager.getAccount(), projectStatus, salesability, unsellableReason, request.description()));
+        projectMapper.insertProject(new ProjectWriteCommand(id, request.externalName(), request.internalName(), request.modelName(), manager.getId(), manager.getAccount(), request.description()));
         replaceProjectMembers(id, request.safeMembers(), request.managerAccount());
         createProjectStages(id, request.safeStages());
-        syncProjectStatus(id);
         publishProjectCreatedEvent(id, request, manager);
         return detail(id);
     }
@@ -87,13 +85,10 @@ public class ProjectServiceImpl implements ProjectService {
     @Transactional
     public ProjectDto update(String id, ProjectRequest request) {
         ensureProjectExists(id);
-        String salesability = resolveDefault(request.safeSalesability(), "salesability", "可销售状态");
-        String unsellableReason = "可销售".equals(salesability) ? null : request.unsellableReason();
         UserLookupEntity manager = requireUser(request.managerAccount(), "项目负责人");
-        projectMapper.updateProject(new ProjectWriteCommand(id, request.externalName(), request.internalName(), request.modelName(), manager.getId(), manager.getAccount(), request.status(), salesability, unsellableReason, request.description()));
+        projectMapper.updateProject(new ProjectWriteCommand(id, request.externalName(), request.internalName(), request.modelName(), manager.getId(), manager.getAccount(), request.description()));
         replaceProjectMembers(id, request.safeMembers(), request.managerAccount());
         replaceStageAssignees(id, request.safeStages());
-        syncProjectStatus(id);
         return detail(id);
     }
 
@@ -105,10 +100,10 @@ public class ProjectServiceImpl implements ProjectService {
 
     @Override
     @Transactional
-    public ProjectDto updateStage(String stageId, StageStatusRequest request) {
-        projectMapper.updateStageStatus(stageId, request.status());
+    public ProjectDto updateStage(String stageId, StageStatusRequest request, String operatorAccount) {
         ProjectStageEntity stage = requireStage(stageId);
-        syncProjectStatus(stage.getProjectId());
+        assertStageStatusOperator(stageId, operatorAccount);
+        projectMapper.updateStageStatus(stageId, request.status());
         return detail(stage.getProjectId());
     }
 
@@ -211,6 +206,31 @@ public class ProjectServiceImpl implements ProjectService {
 
     @Override
     @Transactional
+    public ProjectDto addProjectMaterial(String projectId, FileMetadataRequest request) {
+        ensureProjectExists(projectId);
+        projectMapper.insertProjectMaterialFromRequest(IdUtil.nanoId("mat"), projectId, request);
+        return detail(projectId);
+    }
+
+    @Override
+    @Transactional
+    public ProjectDto publishAnnouncement(String projectId, ProjectAnnouncementRequest request, String publisher) {
+        ensureProjectExists(projectId);
+        String title = ValidationUtil.requireText(request.title(), "公告标题", 120);
+        String content = ValidationUtil.requireText(request.content(), "公告内容", 3000);
+        String announcementType = resolveDefault(request.announcementType(), "project_announcement_type", "公告类型");
+        String publisherName = ValidationUtil.optionalText(publisher, "发布人", 80);
+        if (publisherName == null || publisherName.isBlank()) {
+            publisherName = "KPM";
+        }
+        String announcementId = IdUtil.nanoId("ann");
+        projectMapper.insertProjectAnnouncement(announcementId, projectId, title, content, announcementType, publisherName);
+        projectMapper.insertCustomerPortalMessagesForAnnouncement(projectId, announcementId, announcementType + "：" + title, content);
+        return detail(projectId);
+    }
+
+    @Override
+    @Transactional
     public ProjectDto publishStageMaterial(String materialId) {
         ProjectFileEntity material = projectMapper.stageMaterialForPublish(materialId);
         if (material == null) {
@@ -219,6 +239,17 @@ public class ProjectServiceImpl implements ProjectService {
         projectMapper.markStageMaterialPublished(materialId);
         projectMapper.insertProjectMaterial(IdUtil.nanoId("mat"), material);
         return detail(material.getProjectId());
+    }
+
+    @Override
+    @Transactional
+    public ProjectDto publishProjectMaterialToCustomer(String projectId, String materialId) {
+        ensureProjectExists(projectId);
+        int updated = projectMapper.markProjectMaterialPublic(projectId, materialId, "customer-visible");
+        if (updated == 0) {
+            throw new IllegalArgumentException("项目资料不存在或已删除");
+        }
+        return detail(projectId);
     }
 
     @Override
@@ -325,7 +356,7 @@ public class ProjectServiceImpl implements ProjectService {
             for (ProjectStageRequest stage : providedStages) {
                 String stageId = IdUtil.nanoId("st");
                 String stageName = ValidationUtil.requireText(stage.name(), "阶段名称", 80);
-                projectMapper.insertStage(stageId, projectId, stageName, order++, resolveDefault(stage.status(), "stage_status", "阶段状态"));
+                projectMapper.insertStage(stageId, projectId, stageName, order++, resolveDefault(null, "stage_status", "阶段状态"));
                 insertStageAssignees(stageId, stage.safeAssignees());
             }
             return;
@@ -369,9 +400,6 @@ public class ProjectServiceImpl implements ProjectService {
             if (stageId == null) {
                 continue;
             }
-            if (stage.status() != null && !stage.status().isBlank()) {
-                projectMapper.updateStageStatus(stageId, stage.status());
-            }
             projectMapper.deleteStageAssignees(stageId);
             insertStageAssignees(stageId, stage.safeAssignees());
         }
@@ -394,17 +422,6 @@ public class ProjectServiceImpl implements ProjectService {
             }
             projectMapper.insertStageAssignee(IdUtil.nanoId("sa"), stageId, type, name, account, userId);
         }
-    }
-
-    private void syncProjectStatus(String projectId) {
-        List<String> statuses = projectMapper.stageStatuses(projectId);
-        String nextStatus = resolveDefault(null, "project_status", "项目状态");
-        if (!statuses.isEmpty() && statuses.stream().allMatch(status -> "COMPLETED".equals(projectMapper.enumSemantic("stage_status", status)))) {
-            nextStatus = requiredEnumBySemantic("project_status", "COMPLETED", "项目完成状态");
-        } else if (statuses.stream().anyMatch(status -> "ACTIVE".equals(projectMapper.enumSemantic("stage_status", status)))) {
-            nextStatus = requiredEnumBySemantic("project_status", "ACTIVE", "项目进行中状态");
-        }
-        projectMapper.updateProjectStatus(projectId, nextStatus);
     }
 
     private void replaceTemplateStages(String templateId, List<String> stages) {
@@ -464,6 +481,35 @@ public class ProjectServiceImpl implements ProjectService {
             throw new IllegalArgumentException(label + "不存在，请从已有用户中选择");
         }
         return users.getFirst();
+    }
+
+    private void assertStageStatusOperator(String stageId, String operatorAccount) {
+        String account = stringValue(operatorAccount);
+        if (account == null) {
+            throw new SecurityException("无法识别当前登录用户，请重新登录后再修改阶段状态");
+        }
+        UserLookupEntity operator = requireUser(account, "当前登录用户");
+        List<StageAssigneeEntity> assignees = projectMapper.stageAssignees(stageId);
+        boolean allowed = assignees.stream().anyMatch(assignee -> isSameUser(operator, assignee));
+        if (!allowed) {
+            throw new SecurityException("只有阶段负责人可以修改阶段状态");
+        }
+    }
+
+    private boolean isSameUser(UserLookupEntity operator, StageAssigneeEntity assignee) {
+        if (operator == null || assignee == null) {
+            return false;
+        }
+        return sameText(operator.getId(), assignee.getUserId())
+                || sameText(operator.getAccount(), assignee.getAccount())
+                || sameText(operator.getEmail(), assignee.getAccount());
+    }
+
+    private boolean sameText(String left, String right) {
+        if (left == null || right == null) {
+            return false;
+        }
+        return left.trim().equalsIgnoreCase(right.trim());
     }
 
     private String uniqueProjectId(String source) {

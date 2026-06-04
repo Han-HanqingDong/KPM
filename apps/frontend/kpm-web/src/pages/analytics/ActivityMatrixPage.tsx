@@ -1,13 +1,14 @@
-import { Card, Descriptions, Modal, Select, Space, Table, Tag, Typography } from 'antd';
+import { Button, Card, Descriptions, Modal, Select, Space, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CustomerSelect } from '../../components/common/CustomerSelect';
 import { DataState } from '../../components/common/DataState';
 import { FullscreenView } from '../../components/common/FullscreenView';
 import { ProjectSelect } from '../../components/common/ProjectSelect';
 import { useKpmData } from '../../hooks/useKpmData';
 import type { Customer, Order, Project, Task } from '../../types';
-import { compactId, dateText, isClosedTaskStatus, moneyText } from '../../utils/format';
+import { dateText, isClosedTaskStatus, moneyText } from '../../utils/format';
 
 type ActivityState = 'active' | 'inactive' | 'abnormal' | 'abandoned' | 'empty';
 
@@ -102,6 +103,7 @@ function buildCell(customer: Customer, project: Project, orders: Order[], tasks:
 
 export function ActivityMatrixPage() {
   const { data, isLoading, error } = useKpmData();
+  const navigate = useNavigate();
   const [customerIds, setCustomerIds] = useState<string[]>([]);
   const [projectIds, setProjectIds] = useState<string[]>([]);
   const [states, setStates] = useState<ActivityState[]>([]);
@@ -131,6 +133,16 @@ export function ActivityMatrixPage() {
     if (!states.length) return true;
     return projects.some((project) => states.includes(cellByKey.get(`${customer.id}:${project.id}`)?.state || 'empty'));
   }), [cellByKey, customers, projects, states]);
+
+  function openOrders(cell: ActivityCell) {
+    setSelectedCell(null);
+    navigate(`/orders?customerId=${encodeURIComponent(cell.customer.id)}&projectId=${encodeURIComponent(cell.project.id)}`);
+  }
+
+  function openTasks(cell: ActivityCell) {
+    setSelectedCell(null);
+    navigate(`/tasks?customerId=${encodeURIComponent(cell.customer.id)}&projectId=${encodeURIComponent(cell.project.id)}`);
+  }
 
   const columns = useMemo<ColumnsType<Customer>>(() => {
     const projectColumns: ColumnsType<Customer> = projects.map((project) => ({
@@ -205,37 +217,37 @@ export function ActivityMatrixPage() {
       >
         {renderMatrixTable(false)}
       </Card>
-      <Modal title="客户 × 项目活跃度明细" open={Boolean(selectedCell)} onCancel={() => setSelectedCell(null)} footer={null} width={860}>
+      <Modal
+        title="客户 × 项目活跃度明细"
+        open={Boolean(selectedCell)}
+        onCancel={() => setSelectedCell(null)}
+        footer={null}
+        width={760}
+        zIndex={2600}
+        rootClassName="kpm-activity-detail-modal"
+      >
         {selectedCell ? <Space direction="vertical" size={16} style={{ width: '100%' }}>
           <Descriptions bordered size="small" column={2}>
             <Descriptions.Item label="客户">{selectedCell.customer.name}</Descriptions.Item>
             <Descriptions.Item label="项目">{selectedCell.project.externalName}</Descriptions.Item>
             <Descriptions.Item label="活跃度"><Tag color={stateMeta[selectedCell.state].color}>{selectedCell.stateLabel}</Tag></Descriptions.Item>
             <Descriptions.Item label="最近动作">{selectedCell.latestAt ? `${dateText(selectedCell.latestAt)}（${selectedCell.latestDays} 天前）` : '暂无订单或任务'}</Descriptions.Item>
-            <Descriptions.Item label="订单数量">{selectedCell.orderCount}</Descriptions.Item>
+            <Descriptions.Item label="订单数量">
+              <Button type="link" size="small" disabled={!selectedCell.orderCount} onClick={() => openOrders(selectedCell)}>
+                {selectedCell.orderCount} 单，点击查看订单
+              </Button>
+            </Descriptions.Item>
             <Descriptions.Item label="产品数量">{selectedCell.quantity}</Descriptions.Item>
             <Descriptions.Item label="销售金额">{selectedCell.amountText}</Descriptions.Item>
-            <Descriptions.Item label="任务情况">进行中 {selectedCell.openTaskCount} / 卡点 {selectedCell.blockedTaskCount}</Descriptions.Item>
+            <Descriptions.Item label="任务情况">
+              <Button type="link" size="small" disabled={!selectedCell.tasks.length} onClick={() => openTasks(selectedCell)}>
+                进行中 {selectedCell.openTaskCount} / 卡点 {selectedCell.blockedTaskCount} / 总数 {selectedCell.tasks.length}，点击查看任务
+              </Button>
+            </Descriptions.Item>
           </Descriptions>
-          <Card size="small" title="销售情况">
-            <Table<Order> size="small" rowKey="id" pagination={false} dataSource={selectedCell.orders.slice(0, 8)} columns={[
-              { title: '订单', dataIndex: 'id', width: 120, render: (value) => <Typography.Text code>{compactId(value, 'order')}</Typography.Text> },
-              { title: '类型', dataIndex: 'orderType', width: 100, render: (_, row) => row.orderType || row.type || '-' },
-              { title: '状态', dataIndex: 'status', width: 100, render: (value) => <Tag>{value || '-'}</Tag> },
-              { title: '数量', dataIndex: 'quantity', width: 80 },
-              { title: '金额', width: 140, render: (_, row) => moneyText(row.amount, row.currency) },
-              { title: '下单日期', dataIndex: 'orderDate', width: 120, render: dateText },
-            ]} />
-          </Card>
-          <Card size="small" title="任务情况">
-            <Table<Task> size="small" rowKey="id" pagination={false} dataSource={selectedCell.tasks.slice(0, 8)} columns={[
-              { title: '任务', dataIndex: 'taskNo', width: 120, render: (value, row) => <Typography.Text code>{value || compactId(row.id, 'task')}</Typography.Text> },
-              { title: '标题', dataIndex: 'title', ellipsis: true },
-              { title: '分类', dataIndex: 'category', width: 100 },
-              { title: '状态', dataIndex: 'status', width: 100, render: (value) => <Tag>{value || '-'}</Tag> },
-              { title: '预期完成', dataIndex: 'expectedCompletionAt', width: 120, render: dateText },
-            ]} />
-          </Card>
+          <Typography.Paragraph type="secondary" className="small-text">
+            为避免订单或任务过多导致弹窗内容过长，明细列表已移动到订单管理和任务管理页面；点击上方数量即可带着客户和项目筛选条件跳转。
+          </Typography.Paragraph>
         </Space> : null}
       </Modal>
     </DataState>

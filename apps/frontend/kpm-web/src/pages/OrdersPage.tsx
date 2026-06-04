@@ -1,6 +1,6 @@
 import { PlusOutlined } from '@ant-design/icons';
 import { Button, Card, Descriptions, Drawer, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ActionButtons } from '../components/common/ActionButtons';
 import { CustomerSelect } from '../components/common/CustomerSelect';
@@ -25,13 +25,17 @@ export function OrdersPage() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const [form] = Form.useForm();
-  const [filters, setFilters] = useState({ keyword: '', status: undefined as string | undefined, orderType: undefined as string | undefined, customerId: searchParams.get('customerId') || undefined, projectId: undefined as string | undefined });
+  const [filters, setFilters] = useState({ keyword: '', status: undefined as string | undefined, orderType: undefined as string | undefined, customerId: searchParams.get('customerId') || undefined, projectId: searchParams.get('projectId') || undefined });
   const [editing, setEditing] = useState<Order | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [detail, setDetail] = useState<Order | null>(null);
   const projectId = Form.useWatch('projectId', form);
   const selectedProject = (data?.projects || []).find((project) => project.id === projectId);
   const skuOptions = (selectedProject?.skus || []).map((sku) => ({ label: `${sku.wholeMachinePartNumber} · ${sku.configurationName} · ${sku.memoryType}`, value: sku.id }));
+
+  useEffect(() => {
+    setFilters((prev) => ({ ...prev, customerId: searchParams.get('customerId') || undefined, projectId: searchParams.get('projectId') || undefined }));
+  }, [searchParams]);
 
   const orders = useMemo(() => (data?.orders || [])
     .filter((order) => {

@@ -35,7 +35,10 @@ spring:
                   - "*"
                 exposedHeaders:
                   - Authorization
+                  - X-KPM-Refresh-Token
                 allowCredentials: false
+          default-filters:
+            - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials Access-Control-Allow-Methods Access-Control-Allow-Headers Access-Control-Expose-Headers RETAIN_FIRST
           routes:
             - id: iam
               uri: lb://kpm-iam-service
@@ -52,7 +55,7 @@ spring:
             - id: customers
               uri: lb://kpm-customer-service
               predicates:
-                - Path=/api/customers/**
+                - Path=/api/customers/**,/api/customer-portal/**
             - id: tasks
               uri: lb://kpm-task-service
               predicates:
@@ -69,6 +72,10 @@ spring:
               uri: lb://kpm-analytics-service
               predicates:
                 - Path=/api/analytics/**
+            - id: integrations
+              uri: lb://kpm-integration-service
+              predicates:
+                - Path=/api/integrations/**
             - id: notifications
               uri: lb://kpm-notification-service
               predicates:
@@ -91,3 +98,4 @@ kpm:
     enabled: ${KPM_AUTH_ENABLED:true}
     rbac-enabled: ${KPM_RBAC_ENABLED:true}
     token-secret: ${KPM_AUTH_TOKEN_SECRET:kpm-local-dev-secret-change-me}
+    token-ttl-seconds: ${KPM_AUTH_TOKEN_TTL_SECONDS:7200}

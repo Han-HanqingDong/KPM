@@ -19,7 +19,7 @@ KPM will be built as a controlled Java microservice system designed for at least
 | Cache | Valkey, using Redis-compatible patterns where useful |
 | Messaging | Apache RocketMQ or Kozen-approved MQ |
 | File storage | Alibaba Cloud OSS behind a KPM storage abstraction |
-| Auth | KPM built-in IAM: username/password, password hashing, JWT, refresh token, logout/revocation, login audit |
+| Auth | KPM built-in IAM: username/password, password hashing, lightweight bearer token with sliding renewal; later upgrade path to standard OAuth2/OIDC refresh-token, logout/revocation and login audit |
 | Frontend | React 19, TypeScript, Vite, Ant Design, react-i18next |
 | Deployment | Docker Compose for local development; Kubernetes-ready production deployment |
 | Observability | Spring Boot Actuator, structured logs, Prometheus/Grafana first, tracing later |

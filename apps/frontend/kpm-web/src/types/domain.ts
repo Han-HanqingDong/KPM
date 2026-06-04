@@ -49,7 +49,6 @@ export type ProjectCustomer = {
   projectStatus?: string;
   projectName?: string;
   externalName?: string;
-  salesability?: string;
   requirements?: Requirement[];
 };
 export type Requirement = { id: Id; title: string; status?: string; priority?: string; customerName?: string; userStory?: string; businessValue?: string; acceptance?: string; taskId?: string };
@@ -61,9 +60,6 @@ export type Project = {
   managerAccount?: string;
   managerName?: string;
   managerUserId?: string;
-  status?: string;
-  salesability?: string;
-  unsellableReason?: string;
   description?: string;
   archived?: boolean;
   createdAt?: string;

@@ -1,6 +1,6 @@
 import { PlusOutlined, UploadOutlined } from '@ant-design/icons';
-import { Button, Card, Descriptions, Drawer, Form, Input, Modal, Space, Switch, Table, Tag, Typography, Upload, message } from 'antd';
-import { useMemo, useState } from 'react';
+import { Button, Card, Descriptions, Drawer, Form, Input, Modal, Radio, Space, Switch, Table, Tag, Typography, Upload, message } from 'antd';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ActionButtons } from '../components/common/ActionButtons';
 import { CustomerSelect } from '../components/common/CustomerSelect';
@@ -44,13 +44,17 @@ export function TasksPage() {
   const [detail, setDetail] = useState<Task | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [attachmentModalOpen, setAttachmentModalOpen] = useState(false);
-  const [filters, setFilters] = useState({ keyword: '', status: undefined as string | undefined, category: undefined as string | undefined, customerId: searchParams.get('customerId') || undefined });
+  const [filters, setFilters] = useState({ keyword: '', status: undefined as string | undefined, category: undefined as string | undefined, customerId: searchParams.get('customerId') || undefined, projectId: searchParams.get('projectId') || undefined });
   const operatorName = user?.name || user?.account || '当前用户';
   const taskDefaults = useMemo(() => ({
     category: enumValues(data?.bootstrap?.enumItems || [], 'task_category', ['需求'])[0],
     status: enumValues(data?.bootstrap?.enumItems || [], 'task_status', ['待处理'])[0],
     priority: enumValues(data?.bootstrap?.enumItems || [], 'task_priority', ['中'])[0],
   }), [data?.bootstrap?.enumItems]);
+
+  useEffect(() => {
+    setFilters((prev) => ({ ...prev, customerId: searchParams.get('customerId') || undefined, projectId: searchParams.get('projectId') || undefined }));
+  }, [searchParams]);
 
   const completedStatusValues = useMemo(() => new Set((data?.bootstrap?.enumItems || [])
     .filter((item) => item.enumType === 'task_status' && item.semantic === '完成')
@@ -79,7 +83,8 @@ export function TasksPage() {
         const matchesStatus = !filters.status || task.status === filters.status;
         const matchesCategory = !filters.category || task.category === filters.category;
         const matchesCustomer = !filters.customerId || task.customerId === filters.customerId;
-        return matchesKeyword && matchesStatus && matchesCategory && matchesCustomer;
+        const matchesProject = !filters.projectId || task.projectId === filters.projectId;
+        return matchesKeyword && matchesStatus && matchesCategory && matchesCustomer && matchesProject;
       })
       .sort((left, right) => compareDateDesc(left.createdAt, right.createdAt) || String(right.id || '').localeCompare(String(left.id || '')));
   }, [completedStatusValues, data?.bootstrap?.users, data?.tasks, filters, searchParams, user]);
@@ -133,9 +138,13 @@ export function TasksPage() {
   async function addComment() {
     if (!activeDetail) return;
     const values = await commentForm.validateFields();
+    if (values.commentType === 'external' && !activeDetail.customerId) {
+      message.warning('外部留言必须是关联具体客户的任务');
+      return;
+    }
     const files = normalizeUploadFiles(values.files);
     const attachments = files.length ? await uploadBusinessFiles(files, 'task-comment-attachments', activeDetail.id, operatorName) : [];
-    const updated = await kpmApi.addTaskComment(activeDetail.id, { content: values.content, author: operatorName, attachments });
+    const updated = await kpmApi.addTaskComment(activeDetail.id, { content: values.content, commentType: values.commentType || 'internal', author: operatorName, attachments });
     setDetail(updated);
     message.success('评论已发布');
     commentForm.resetFields();
@@ -177,6 +186,7 @@ export function TasksPage() {
             <EnumSelect bootstrap={data?.bootstrap} enumType="task_status" placeholder="任务状态" value={filters.status} onChange={(status) => setFilters((prev) => ({ ...prev, status }))} style={{ width: 160 }} />
             <EnumSelect bootstrap={data?.bootstrap} enumType="task_category" placeholder="任务分类" value={filters.category} onChange={(category) => setFilters((prev) => ({ ...prev, category }))} style={{ width: 160 }} />
             <CustomerSelect customers={data?.customers} placeholder="客户" value={filters.customerId} onChange={(customerId) => setFilters((prev) => ({ ...prev, customerId }))} style={{ width: 220 }} />
+            <ProjectSelect projects={data?.projects} placeholder="项目" value={filters.projectId} onChange={(projectId) => setFilters((prev) => ({ ...prev, projectId }))} style={{ width: 220 }} />
           </Space>
         </Card>
         <Card className="kpm-card">
@@ -247,12 +257,15 @@ export function TasksPage() {
             <Card size="small" title="评论 / 留言">
               <Space direction="vertical" style={{ width: '100%' }}>
                 {(activeDetail.comments || []).map((comment: AnyRecord) => <article className="kpm-comment" key={comment.id}>
-                  <strong>{comment.author}</strong>
+                  <Space size={8} wrap><strong>{comment.author}</strong><Tag color={comment.commentType === 'external' ? 'processing' : 'default'}>{comment.commentType === 'external' ? '外部留言' : '内部留言'}</Tag></Space>
                   <Typography.Paragraph>{comment.content || '-'}</Typography.Paragraph>
                   {(comment.attachments || []).length ? <Space wrap>{comment.attachments.map((file: AnyRecord, index: number) => <Tag key={file.objectKey || file.fileName || index} onClick={() => downloadBusinessFile(file).catch((err) => message.error(err.message || '下载失败'))} className="clickable-tag">{file.fileName || file.name || '附件'}</Tag>)}</Space> : null}
                   <small>{dateTimeText(comment.createdAt)}</small>
                 </article>)}
                 <Form form={commentForm} layout="vertical">
+                  <Form.Item name="commentType" label="留言类型" initialValue="internal">
+                    <Radio.Group optionType="button" buttonStyle="solid" options={[{ label: '内部留言', value: 'internal' }, { label: '外部留言（客户可见）', value: 'external' }]} />
+                  </Form.Item>
                   <Form.Item name="content" rules={[validationRules.required('请输入评论内容')]}><Input.TextArea rows={3} placeholder="输入评论" /></Form.Item>
                   <Form.Item name="files" label="评论附件" valuePropName="fileList" getValueFromEvent={uploadFileList}>
                     <Upload multiple beforeUpload={beforeUpload}>

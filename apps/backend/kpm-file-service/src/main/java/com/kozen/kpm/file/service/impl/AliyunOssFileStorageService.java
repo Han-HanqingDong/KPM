@@ -71,6 +71,7 @@ public class AliyunOssFileStorageService implements FileStorageService {
                 fileType,
                 fileType,
                 humanFileSize(file.getSize()),
+                humanFileSize(file.getSize()),
                 file.getSize(),
                 file.getContentType() == null ? "application/octet-stream" : file.getContentType(),
                 uploader,

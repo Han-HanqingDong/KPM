@@ -47,10 +47,7 @@ public class ProjectConverter {
                 project.getManagerUserId(),
                 project.getManagerAccount(),
                 managerName,
-                project.getStatus(),
                 project.getArchived(),
-                project.getSalesability(),
-                project.getUnsellableReason(),
                 project.getDescription(),
                 project.getCreatedAt(),
                 project.getUpdatedAt(),
@@ -105,8 +102,8 @@ public class ProjectConverter {
 
     public ProjectFileDto toFileDto(ProjectFileEntity file) {
         return new ProjectFileDto(
-                file.getId(), file.getStageId(), file.getProjectId(), file.getSourceStage(), file.getStageName(), file.getFileName(), file.getFileType(), file.getFileSize(),
-                file.getUploader(), file.getBucket(), file.getObjectKey(), file.getStorageUrl(), file.getStorageCategory(), file.getShareTarget(), file.getPublishedToProject(), file.getUploadedAt(), file.getPublishedAt()
+                file.getId(), file.getStageId(), file.getProjectId(), file.getSourceStage(), file.getStageName(), file.getFileName(), file.getFileType(), file.getFileSize(), file.getDescription(),
+                file.getUploader(), file.getBucket(), file.getObjectKey(), file.getStorageUrl(), file.getStorageCategory(), file.getShareTarget(), file.getPublishedToProject(), file.getPublicVisible(), file.getUploadedAt(), file.getPublishedAt(), file.getPublicAt()
         );
     }
 

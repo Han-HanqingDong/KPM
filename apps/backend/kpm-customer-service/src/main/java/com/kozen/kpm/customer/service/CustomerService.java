@@ -4,6 +4,8 @@ import com.kozen.kpm.common.dto.FileMetadataRequest;
 import com.kozen.kpm.customer.dto.CustomerContactRequest;
 import com.kozen.kpm.customer.dto.CustomerDto;
 import com.kozen.kpm.customer.dto.CustomerFollowupRequest;
+import com.kozen.kpm.customer.dto.CustomerNotificationRequest;
+import com.kozen.kpm.customer.dto.CustomerNotificationResultDto;
 import com.kozen.kpm.customer.dto.CustomerRequest;
 
 import java.util.List;
@@ -40,4 +42,7 @@ public interface CustomerService {
 
     /** Add one uploaded material metadata record to the customer. */
     CustomerDto addMaterial(String id, FileMetadataRequest request);
+
+    /** Send a customer-level notification to all customer contacts with email. */
+    CustomerNotificationResultDto sendNotification(String id, CustomerNotificationRequest request, String publisher);
 }
