@@ -32,6 +32,8 @@ export function ResourcesPage() {
   const { data, isLoading, error } = useKpmData();
   const refresh = useRefreshKpmData();
   const [keyword, setKeyword] = useState('');
+  const [enumTypeFilter, setEnumTypeFilter] = useState<string | undefined>();
+  const [enumKeyword, setEnumKeyword] = useState('');
   const [userForm] = Form.useForm();
   const [deptForm] = Form.useForm();
   const [roleForm] = Form.useForm();
@@ -48,6 +50,16 @@ export function ResourcesPage() {
   const departmentOptions = (data?.bootstrap.departments || []).map((dept) => ({ label: dept.name, value: dept.name }));
 
   const filteredUsers = useMemo(() => (data?.bootstrap.users || []).filter((user) => includesKeyword([user.name, user.email, user.account], keyword)), [data?.bootstrap.users, keyword]);
+  const enumFilterOptions = useMemo(() => {
+    const configured = enumTypeOptions.map((item) => item.value);
+    const actual = (data?.bootstrap.enumItems || []).map((item) => item.enumType).filter(Boolean);
+    return [...new Set([...configured, ...actual])].map((value) => ({ label: enumTypeOptions.find((item) => item.value === value)?.label || value, value }));
+  }, [data?.bootstrap.enumItems]);
+  const filteredEnumItems = useMemo(() => (data?.bootstrap.enumItems || []).filter((item) => {
+    const matchesType = !enumTypeFilter || item.enumType === enumTypeFilter;
+    const matchesKeyword = includesKeyword([item.enumType, item.name, item.value, item.semantic], enumKeyword);
+    return matchesType && matchesKeyword;
+  }), [data?.bootstrap.enumItems, enumKeyword, enumTypeFilter]);
 
   function openUser(row?: User) {
     setUserModal({ open: true, row });
@@ -173,7 +185,12 @@ export function ResourcesPage() {
             },
             {
               key: 'enums', label: '枚举管理', children: <Card className="kpm-card" extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => openEnum()}>新增枚举</Button>}>
-                <Table<EnumItem> size="small" rowKey="id" dataSource={data?.bootstrap.enumItems || []} pagination={{ pageSize: 12 }} columns={[
+                <Space wrap className="kpm-table-toolbar">
+                  <Select allowClear showSearch optionFilterProp="label" placeholder="按枚举类型筛选" value={enumTypeFilter} onChange={setEnumTypeFilter} options={enumFilterOptions} style={{ width: 260 }} />
+                  <Input.Search allowClear placeholder="搜索名称 / 值 / 语义" onSearch={setEnumKeyword} onChange={(event) => setEnumKeyword(event.target.value)} style={{ width: 260 }} />
+                  <Tag color="blue">共 {filteredEnumItems.length} 项</Tag>
+                </Space>
+                <Table<EnumItem> size="small" rowKey="id" dataSource={filteredEnumItems} pagination={{ pageSize: 12, showSizeChanger: true }} columns={[
                   { title: '枚举类型', dataIndex: 'enumType', width: 180 },
                   { title: '展示名称', dataIndex: 'name' },
                   { title: '值', dataIndex: 'value' },

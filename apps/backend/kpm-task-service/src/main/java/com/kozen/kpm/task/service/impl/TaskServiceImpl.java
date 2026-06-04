@@ -122,6 +122,12 @@ public class TaskServiceImpl implements TaskService {
         return detail(id);
     }
 
+    @Override
+    public TaskDto deleteAttachment(String id, String attachmentId) {
+        taskMapper.deleteAttachment(id, attachmentId);
+        return detail(id);
+    }
+
     private TaskDto enrichTask(TaskEntity task) {
         String id = task.getId();
         return taskConverter.toTaskDto(

@@ -250,12 +250,12 @@ public interface ProjectMapper {
                    case when sa.assignee_type='user' then coalesce(u.account, sa.account) else sa.account end as account,
                    sa.user_id as userId
             from kpm_stage_assignees sa
-            left join kpm_users u on u.id = sa.user_id or (sa.user_id is null and u.account = sa.account)
+            left join kpm_users u on u.del_flag=0 and (u.id = sa.user_id or (sa.user_id is null and u.account = sa.account))
             where sa.stage_id=#{stageId} and sa.del_flag=0 order by sa.id
             """)
     List<StageAssigneeEntity> stageAssignees(@Param("stageId") String stageId);
 
-    @Update("update kpm_stage_assignees set del_flag=1, update_time=current_timestamp where stage_id=#{stageId}")
+    @Update("update kpm_stage_assignees set del_flag=1, update_time=current_timestamp where stage_id=#{stageId} and del_flag=0")
     void deleteStageAssignees(@Param("stageId") String stageId);
 
     @Insert("insert into kpm_stage_assignees (id, stage_id, assignee_type, assignee_name, account, user_id) values (#{id}, #{stageId}, #{type}, #{name}, #{account}, #{userId})")

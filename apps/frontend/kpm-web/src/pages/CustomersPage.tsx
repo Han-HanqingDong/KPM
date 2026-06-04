@@ -13,12 +13,21 @@ import { useKpmData, useRefreshKpmData } from '../hooks/useKpmData';
 import { confirmSubmit } from '../hooks/useConfirmingForm';
 import { kpmApi } from '../services/kpmApi';
 import type { AnyRecord, Customer } from '../types';
-import { downloadBusinessFile, normalizeUploadFiles, uploadBusinessFiles } from '../utils/fileUpload';
+import { attachmentLimitMessage, downloadBusinessFile, isWithinAttachmentLimit, normalizeUploadFiles, uploadBusinessFiles } from '../utils/fileUpload';
 import { dateTimeText, includesKeyword } from '../utils/format';
 import { validationRules } from '../validation';
 
 function uploadFileList(event: AnyRecord) {
   return Array.isArray(event) ? event : event?.fileList;
+}
+
+
+function beforeUpload(file: File) {
+  if (!isWithinAttachmentLimit(file)) {
+    message.error(attachmentLimitMessage(file.name));
+    return Upload.LIST_IGNORE;
+  }
+  return false;
 }
 
 export function CustomersPage() {
@@ -206,7 +215,7 @@ export function CustomersPage() {
           <Form form={followupForm} layout="vertical">
             <Form.Item name="content" label="跟进内容" rules={[validationRules.required('请输入跟进内容'), validationRules.max(1000)]}><Input.TextArea rows={5} /></Form.Item>
             <Form.Item name="files" label="附件" valuePropName="fileList" getValueFromEvent={uploadFileList}>
-              <Upload multiple beforeUpload={() => false}>
+              <Upload multiple beforeUpload={beforeUpload}>
                 <Button icon={<UploadOutlined />}>选择附件</Button>
               </Upload>
             </Form.Item>
@@ -215,7 +224,7 @@ export function CustomersPage() {
         <Modal title="上传客户资料" open={materialModal} maskClosable onCancel={() => setMaterialModal(false)} onOk={addMaterial} okText="上传">
           <Form form={materialForm} layout="vertical">
             <Form.Item name="files" label="选择文件" valuePropName="fileList" getValueFromEvent={uploadFileList} rules={[validationRules.required('请选择文件')]}>
-              <Upload multiple beforeUpload={() => false}>
+              <Upload multiple beforeUpload={beforeUpload}>
                 <Button icon={<UploadOutlined />}>选择文件</Button>
               </Upload>
             </Form.Item>

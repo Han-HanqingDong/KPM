@@ -1,4 +1,4 @@
-import { ArrowLeftOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, PlusOutlined, TeamOutlined, UploadOutlined } from '@ant-design/icons';
 import { Button, Card, Checkbox, Descriptions, Drawer, Empty, Form, Input, Modal, Select, Space, Table, Tabs, Tag, Typography, Upload, message } from 'antd';
 import { useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -14,12 +14,21 @@ import { useKpmData, useRefreshKpmData } from '../hooks/useKpmData';
 import { confirmSubmit } from '../hooks/useConfirmingForm';
 import { kpmApi } from '../services/kpmApi';
 import type { AnyRecord, ProjectSku, ProjectStage } from '../types';
-import { downloadBusinessFile, normalizeUploadFiles, uploadBusinessFiles } from '../utils/fileUpload';
-import { dateTimeText, enumValues } from '../utils/format';
+import { MAX_ATTACHMENT_SIZE_MB, attachmentLimitMessage, downloadBusinessFile, isWithinAttachmentLimit, normalizeUploadFiles, uploadBusinessFiles } from '../utils/fileUpload';
+import { dateTimeText, enumValues, includesKeyword } from '../utils/format';
 import { validationRules } from '../validation';
 
 function uploadFileList(event: AnyRecord) {
   return Array.isArray(event) ? event : event?.fileList;
+}
+
+
+function beforeUpload(file: File) {
+  if (!isWithinAttachmentLimit(file)) {
+    message.error(attachmentLimitMessage(file.name));
+    return Upload.LIST_IGNORE;
+  }
+  return false;
 }
 
 export function ProjectDetailPage() {
@@ -35,6 +44,7 @@ export function ProjectDetailPage() {
   const [stageRecordForm] = Form.useForm();
   const [stageMaterialForm] = Form.useForm();
   const [stageTaskForm] = Form.useForm();
+  const [stageAssigneeForm] = Form.useForm();
   const [requirementForm] = Form.useForm();
   const [skuModal, setSkuModal] = useState<{ open: boolean; row?: ProjectSku }>({ open: false });
   const [memberModal, setMemberModal] = useState(false);
@@ -43,12 +53,15 @@ export function ProjectDetailPage() {
   const [stageRecordModal, setStageRecordModal] = useState(false);
   const [stageMaterialModal, setStageMaterialModal] = useState(false);
   const [stageTaskModal, setStageTaskModal] = useState(false);
+  const [stageAssigneeStage, setStageAssigneeStage] = useState<ProjectStage | null>(null);
   const [requirementsCustomer, setRequirementsCustomer] = useState<AnyRecord | null>(null);
   const [requirementModal, setRequirementModal] = useState(false);
+  const [projectCustomerKeyword, setProjectCustomerKeyword] = useState('');
 
   const project = useMemo(() => (data?.projects || []).find((item) => item.id === id), [data?.projects, id]);
   const activeStage = useMemo(() => (project?.stages || []).find((stage) => stage.id === stageDetail?.id) || stageDetail, [project?.stages, stageDetail]);
   const activeProjectCustomer = useMemo(() => (project?.projectCustomers || []).find((customer: AnyRecord) => customer.customerId === requirementsCustomer?.customerId) || requirementsCustomer, [project?.projectCustomers, requirementsCustomer]);
+  const filteredProjectCustomers = useMemo(() => (project?.projectCustomers || []).filter((customer: AnyRecord) => includesKeyword([customer.customerName, customer.name, customer.shortName, customer.region, customer.projectStatus], projectCustomerKeyword)), [project?.projectCustomers, projectCustomerKeyword]);
   const backTo = (location.state as { from?: string } | null)?.from || '/projects';
   const operatorName = user?.name || user?.account || '当前用户';
   const taskDefaults = useMemo(() => ({
@@ -107,6 +120,38 @@ export function ProjectDetailPage() {
     refresh();
   }
 
+  function stageAssigneeAccounts(stage?: ProjectStage | null) {
+    return (((stage as AnyRecord)?.assignees || []) as AnyRecord[])
+      .map((item) => item.account || item.userAccount)
+      .filter(Boolean);
+  }
+
+  function renderStageAssignees(stage?: ProjectStage | null, max = 3) {
+    const assignees = (((stage as AnyRecord)?.assignees || []) as AnyRecord[]);
+    if (!assignees.length) return <Typography.Text type="secondary">未设置</Typography.Text>;
+    return <Space size={4} wrap>{assignees.slice(0, max).map((item) => <Tag key={item.account || item.assigneeName || item.name}>{item.assigneeName || item.name || item.account}</Tag>)}{assignees.length > max ? <Tag>+{assignees.length - max}</Tag> : null}</Space>;
+  }
+
+  function openStageAssigneeModal(stage: ProjectStage) {
+    const latest = (project?.stages || []).find((item) => item.id === stage.id) || stage;
+    setStageAssigneeStage(latest);
+    stageAssigneeForm.resetFields();
+    stageAssigneeForm.setFieldsValue({ assigneeAccounts: stageAssigneeAccounts(latest) });
+  }
+
+  async function submitStageAssignees() {
+    if (!stageAssigneeStage) return;
+    const values = await stageAssigneeForm.validateFields();
+    const accounts = (values.assigneeAccounts || []) as string[];
+    confirmSubmit('确认保存阶段负责人？', async () => {
+      await kpmApi.replaceStageAssignees(stageAssigneeStage.id, { assignees: accounts.map((account) => ({ type: 'user', account })) });
+      message.success('阶段负责人已更新');
+      setStageAssigneeStage(null);
+      stageAssigneeForm.resetFields();
+      refresh();
+    });
+  }
+
   async function submitStageMaterial() {
     if (!activeStage) return;
     const values = await stageMaterialForm.validateFields();
@@ -152,13 +197,21 @@ export function ProjectDetailPage() {
   async function submitStageTask() {
     if (!activeStage) return;
     const values = await stageTaskForm.validateFields();
-    await kpmApi.createTask({
-      ...values,
+    const files = normalizeUploadFiles(values.files);
+    const { files: _files, ...payload } = values;
+    const task = await kpmApi.createTask({
+      ...payload,
       projectId: id,
       stageId: activeStage.id,
       creator: operatorName,
       source: '阶段详情',
     });
+    if (files.length) {
+      const materials = await uploadBusinessFiles(files, 'task-attachments', task.id, operatorName);
+      for (const material of materials) {
+        await kpmApi.addTaskAttachment(task.id, material);
+      }
+    }
     message.success('阶段任务已创建');
     setStageTaskModal(false);
     stageTaskForm.resetFields();
@@ -213,10 +266,10 @@ export function ProjectDetailPage() {
                   children: <Table<ProjectStage> size="small" rowKey="id" dataSource={project.stages || []} pagination={false} columns={[
                     { title: '阶段', render: (_, row: ProjectStage) => <button className="link-button" type="button" onClick={() => setStageDetail(row)}>{row.name || (row as AnyRecord).stageName || '-'}</button> },
                     { title: '状态', width: 220, render: (_, row) => <EnumSelect bootstrap={data?.bootstrap} enumType="stage_status" value={row.status} onChange={(value) => value && updateStage(row, value)} /> },
-                    { title: '负责人', render: (_, row: AnyRecord) => <Space wrap>{(row.assignees || []).slice(0, 3).map((item: AnyRecord) => <Tag key={item.account || item.assigneeName}>{item.assigneeName || item.name || item.account}</Tag>)}</Space> },
+                    { title: '负责人', render: (_, row: ProjectStage) => <Space size={8} wrap>{renderStageAssignees(row)}<Button size="small" type="link" icon={<TeamOutlined />} onClick={() => openStageAssigneeModal(row)}>维护</Button></Space> },
                     { title: '资料', width: 90, render: (_, row: AnyRecord) => <Tag>{(row.materials || []).length}</Tag> },
                     { title: '记录', width: 90, render: (_, row: AnyRecord) => <Tag>{(row.records || []).length}</Tag> },
-                    { title: '操作', width: 110, render: (_, row) => <Button size="small" onClick={() => setStageDetail(row)}>阶段详情</Button> },
+                    { title: '操作', width: 120, render: (_, row) => <Button size="small" type="primary" ghost onClick={() => setStageDetail(row)}>阶段详情</Button> },
                   ]} />,
                 },
                 {
@@ -229,7 +282,7 @@ export function ProjectDetailPage() {
                   ]} /></Card>,
                 },
                 {
-                  key: 'customers', label: '关联客户', children: <Card className="kpm-card" extra={<Button icon={<PlusOutlined />} onClick={() => setCustomerModal(true)}>关联客户</Button>}><Table size="small" rowKey={(row: AnyRecord) => row.customerId || row.id} dataSource={project.projectCustomers || []} pagination={false} columns={[
+                  key: 'customers', label: '关联客户', children: <Card className="kpm-card" extra={<Space><Input.Search allowClear placeholder="搜索客户 / 地区 / 状态" onSearch={setProjectCustomerKeyword} onChange={(event) => setProjectCustomerKeyword(event.target.value)} style={{ width: 260 }} /><Button icon={<PlusOutlined />} onClick={() => setCustomerModal(true)}>关联客户</Button></Space>}><Table size="small" rowKey={(row: AnyRecord) => row.customerId || row.id} dataSource={filteredProjectCustomers} pagination={{ pageSize: 8, showSizeChanger: true }} columns={[
                     { title: '客户', render: (_, row: AnyRecord) => row.customerName || row.name },
                     { title: '地区', dataIndex: 'region' },
                     { title: '项目状态', dataIndex: 'projectStatus', render: (value: string, row: AnyRecord) => <EnumSelect bootstrap={data?.bootstrap} enumType="customer_project_status" value={value} onChange={(next) => kpmApi.updateProjectCustomerStatus(id, row.customerId, { projectStatus: next }).then(() => { message.success('客户项目状态已更新'); refresh(); })} /> },
@@ -262,7 +315,7 @@ export function ProjectDetailPage() {
                   <Descriptions.Item label="阶段名称">{(activeStage as AnyRecord).name || (activeStage as AnyRecord).stageName || '-'}</Descriptions.Item>
                   <Descriptions.Item label="状态"><StatusTag value={activeStage.status} /></Descriptions.Item>
                   <Descriptions.Item label="负责人" span={2}>
-                    <Space wrap>{((activeStage as AnyRecord).assignees || []).map((item: AnyRecord) => <Tag key={item.account || item.assigneeName}>{item.assigneeName || item.name || item.account}</Tag>)}</Space>
+                    <Space wrap>{renderStageAssignees(activeStage, 6)}<Button size="small" icon={<TeamOutlined />} onClick={() => openStageAssigneeModal(activeStage)}>维护负责人</Button></Space>
                   </Descriptions.Item>
                 </Descriptions>
 
@@ -340,7 +393,7 @@ export function ProjectDetailPage() {
             <Modal title="上传阶段资料" open={stageMaterialModal} maskClosable onCancel={() => setStageMaterialModal(false)} onOk={submitStageMaterial} okText="上传">
               <Form form={stageMaterialForm} layout="vertical">
                 <Form.Item name="files" label="选择文件" valuePropName="fileList" getValueFromEvent={uploadFileList} rules={[validationRules.required('请选择文件')]}>
-                  <Upload multiple beforeUpload={() => false}>
+                  <Upload multiple beforeUpload={beforeUpload}>
                     <Button icon={<UploadOutlined />}>选择文件</Button>
                   </Upload>
                 </Form.Item>
@@ -350,9 +403,16 @@ export function ProjectDetailPage() {
               <Form form={stageRecordForm} layout="vertical">
                 <Form.Item name="content" label="记录内容" rules={[validationRules.required('请输入记录内容'), validationRules.max(2000)]}><Input.TextArea rows={5} /></Form.Item>
                 <Form.Item name="files" label="附件" valuePropName="fileList" getValueFromEvent={uploadFileList}>
-                  <Upload multiple beforeUpload={() => false}>
+                  <Upload multiple beforeUpload={beforeUpload}>
                     <Button icon={<UploadOutlined />}>选择附件</Button>
                   </Upload>
+                </Form.Item>
+              </Form>
+            </Modal>
+            <Modal title={stageAssigneeStage ? `维护阶段负责人：${(stageAssigneeStage as AnyRecord).name || (stageAssigneeStage as AnyRecord).stageName || '-'}` : '维护阶段负责人'} open={Boolean(stageAssigneeStage)} maskClosable onCancel={() => setStageAssigneeStage(null)} onOk={submitStageAssignees} width={620} okText="保存">
+              <Form form={stageAssigneeForm} layout="vertical">
+                <Form.Item name="assigneeAccounts" label="阶段负责人" extra="支持多选，必须从已有用户中搜索选择。">
+                  <UserSelect bootstrap={data?.bootstrap} mode="multiple" placeholder="输入姓名或邮箱搜索负责人" />
                 </Form.Item>
               </Form>
             </Modal>
@@ -371,6 +431,11 @@ export function ProjectDetailPage() {
                 <Form.Item name="assignees" label="执行者"><UserSelect bootstrap={data?.bootstrap} mode="multiple" /></Form.Item>
                 <Form.Item name="participants" label="参与者"><UserSelect bootstrap={data?.bootstrap} mode="multiple" /></Form.Item>
                 <Form.Item name="expectedCompletionAt" label="预期完成时间"><Input type="date" /></Form.Item>
+                <Form.Item name="files" label={`附件（可选，单个不超过 ${MAX_ATTACHMENT_SIZE_MB}MB）`} valuePropName="fileList" getValueFromEvent={uploadFileList}>
+                  <Upload multiple beforeUpload={beforeUpload}>
+                    <Button icon={<UploadOutlined />}>选择附件</Button>
+                  </Upload>
+                </Form.Item>
                 <Form.Item name="blocked" valuePropName="checked"><Checkbox>标记为卡点任务</Checkbox></Form.Item>
               </Form>
             </Modal>

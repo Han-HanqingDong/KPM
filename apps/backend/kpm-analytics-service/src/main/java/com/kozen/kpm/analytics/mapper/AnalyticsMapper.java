@@ -16,25 +16,25 @@ import java.util.List;
 /** Analytics query mapper backed by MyBatis. */
 @Mapper
 public interface AnalyticsMapper {
-    @Select("select count(*) from kpm_projects")
+    @Select("select count(*) from kpm_projects where del_flag=0")
     Integer projectCount();
 
     @Select("""
             select count(*)
             from kpm_projects p
             join kpm_enum_items e on e.enum_type='project_status' and e.value=p.status
-            where coalesce(e.semantic, '') = 'ACTIVE' or p.status = '进行中'
+            where p.del_flag=0 and (coalesce(e.semantic, '') = 'ACTIVE' or p.status = '进行中')
             """)
     Integer activeProjectCount();
 
-    @Select("select count(*) from kpm_customers")
+    @Select("select count(*) from kpm_customers where del_flag=0")
     Integer customerCount();
 
     @Select("""
             select count(*)
             from kpm_tasks t
             left join kpm_enum_items e on e.enum_type='task_status' and e.value=t.status
-            where coalesce(e.semantic, '普通') not in ('完成','拒绝')
+            where t.del_flag=0 and coalesce(e.semantic, '普通') not in ('完成','拒绝')
             """)
     Integer openTaskCount();
 
@@ -47,7 +47,8 @@ public interface AnalyticsMapper {
                    sum(o.amount) as amount,
                    count(*) as order_count,
                    sum(o.quantity) as product_quantity
-            from kpm_orders o join kpm_projects p on p.id=o.project_id join kpm_customers c on c.id=o.customer_id
+            from kpm_orders o join kpm_projects p on p.id=o.project_id and p.del_flag=0 join kpm_customers c on c.id=o.customer_id and c.del_flag=0
+            where o.del_flag=0
             group by period, p.external_name, c.name, c.region, o.currency
             order by period, p.external_name
             """)
@@ -57,20 +58,21 @@ public interface AnalyticsMapper {
             select c.id as customer_id, c.name as customer_name, c.region, c.address, c.level, c.status,
                    (select string_agg(distinct coalesce(u.name, co.owner_name), ', ')
                     from kpm_customer_owners co
-                    left join kpm_users u on u.id = co.owner_user_id or (co.owner_user_id is null and u.name = co.owner_name)
-                    where co.customer_id=c.id and co.owner_type='sales') as sales_owners,
+                    left join kpm_users u on u.del_flag=0 and (u.id = co.owner_user_id or (co.owner_user_id is null and u.name = co.owner_name))
+                    where co.customer_id=c.id and co.owner_type='sales' and co.del_flag=0) as sales_owners,
                    (select string_agg(distinct coalesce(u.name, co.owner_name), ', ')
                     from kpm_customer_owners co
-                    left join kpm_users u on u.id = co.owner_user_id or (co.owner_user_id is null and u.name = co.owner_name)
-                    where co.customer_id=c.id and co.owner_type='support') as support_owners,
+                    left join kpm_users u on u.del_flag=0 and (u.id = co.owner_user_id or (co.owner_user_id is null and u.name = co.owner_name))
+                    where co.customer_id=c.id and co.owner_type='support' and co.del_flag=0) as support_owners,
                    (select string_agg(distinct p.external_name, ', ')
                     from kpm_project_customers pc
-                    join kpm_projects p on p.id=pc.project_id
-                    where pc.customer_id=c.id) as projects,
+                    join kpm_projects p on p.id=pc.project_id and p.del_flag=0
+                    where pc.customer_id=c.id and pc.del_flag=0) as projects,
                    (select coalesce(sum(o.quantity), 0)
                     from kpm_orders o
-                    where o.customer_id=c.id) as ordered_quantity
+                    where o.customer_id=c.id and o.del_flag=0) as ordered_quantity
             from kpm_customers c
+            where c.del_flag=0
             order by c.region, c.name
             """)
     List<ResourceMapRow> resourceMap();
@@ -96,16 +98,16 @@ public interface AnalyticsMapper {
                    count(t.id) filter (where coalesce(ts.semantic, '普通') not in ('完成','拒绝') and t.category='需求') as open_requirement_count,
                    count(t.id) filter (where coalesce(ts.semantic, '普通') not in ('完成','拒绝') and t.category='Bug') as open_bug_count,
                    count(t.id) filter (where coalesce(ts.semantic, '普通') not in ('完成','拒绝') and t.category not in ('需求','Bug')) as open_other_count,
-                   count(t.id) filter (where t.blocked = true) as blocked_count
+                   count(t.id) filter (where coalesce(ts.semantic, '普通') not in ('完成','拒绝') and t.blocked = true) as blocked_count
             from kpm_customers c
-            join kpm_customer_owners co on co.customer_id=c.id and co.owner_type='support'
-            left join kpm_users u on u.id = co.owner_user_id or (co.owner_user_id is null and u.name = co.owner_name)
-            left join kpm_tasks t on t.customer_id=c.id and exists (
+            join kpm_customer_owners co on co.customer_id=c.id and co.owner_type='support' and co.del_flag=0
+            left join kpm_users u on u.del_flag=0 and (u.id = co.owner_user_id or (co.owner_user_id is null and u.name = co.owner_name))
+            left join kpm_tasks t on t.customer_id=c.id and t.del_flag=0 and exists (
                 select 1 from kpm_task_assignees ta
-                where ta.task_id=t.id and (ta.user_id = co.owner_user_id or (ta.user_id is null and ta.assignee_name = coalesce(u.name, co.owner_name)))
+                where ta.task_id=t.id and ta.del_flag=0 and (ta.user_id = co.owner_user_id or (ta.user_id is null and ta.assignee_name = coalesce(u.name, co.owner_name)))
             )
-            left join kpm_enum_items ts on ts.enum_type='task_status' and ts.value=t.status
-            where (#{customerId} = '' or c.id::text = #{customerId})
+            left join kpm_enum_items ts on ts.enum_type='task_status' and ts.value=t.status and ts.del_flag=0
+            where c.del_flag=0 and (#{customerId} = '' or c.id::text = #{customerId})
             group by c.id, c.name, coalesce(u.name, co.owner_name)
             order by c.name, coalesce(u.name, co.owner_name)
             """)
@@ -118,11 +120,12 @@ public interface AnalyticsMapper {
                    count(distinct t.id) filter (where coalesce(ts.semantic, '普通') not in ('完成','拒绝')) as open_task_count,
                    count(distinct pc.project_id) as project_count
             from kpm_customers c
-            left join kpm_customer_followups cf on cf.customer_id=c.id
-            left join kpm_orders o on o.customer_id=c.id
-            left join kpm_tasks t on t.customer_id=c.id
-            left join kpm_enum_items ts on ts.enum_type='task_status' and ts.value=t.status
-            left join kpm_project_customers pc on pc.customer_id=c.id
+            left join kpm_customer_followups cf on cf.customer_id=c.id and cf.del_flag=0
+            left join kpm_orders o on o.customer_id=c.id and o.del_flag=0
+            left join kpm_tasks t on t.customer_id=c.id and t.del_flag=0
+            left join kpm_enum_items ts on ts.enum_type='task_status' and ts.value=t.status and ts.del_flag=0
+            left join kpm_project_customers pc on pc.customer_id=c.id and pc.del_flag=0
+            where c.del_flag=0
             group by c.id, c.name, c.region, c.level, c.status
             order by c.name
             """)

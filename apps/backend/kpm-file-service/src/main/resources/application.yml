@@ -8,8 +8,8 @@ spring:
     import: optional:nacos:${spring.application.name}.${spring.cloud.nacos.config.file-extension:yaml}
   servlet:
     multipart:
-      max-file-size: ${KPM_UPLOAD_MAX_FILE_SIZE:200MB}
-      max-request-size: ${KPM_UPLOAD_MAX_REQUEST_SIZE:500MB}
+      max-file-size: ${KPM_UPLOAD_MAX_FILE_SIZE:500MB}
+      max-request-size: ${KPM_UPLOAD_MAX_REQUEST_SIZE:520MB}
   cloud:
     nacos:
       server-addr: ${KPM_NACOS_ADDR:127.0.0.1:8848}

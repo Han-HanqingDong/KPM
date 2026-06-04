@@ -71,7 +71,7 @@ public interface TaskMapper {
               and (#{like} = '' or t.title ilike #{like} or t.description ilike #{like})
               and (#{status} = '' or t.status = #{status})
               and (#{category} = '' or t.category = #{category})
-            order by t.updated_at desc, t.created_at desc
+            order by t.created_at desc, t.id desc
             """)
     List<TaskEntity> list(@Param("like") String like, @Param("status") String status, @Param("category") String category);
 
@@ -234,4 +234,8 @@ public interface TaskMapper {
             values (#{attachmentId}, #{taskId}, #{body.fileName}, #{body.fileType}, #{body.fileSize}, #{body.uploader}, #{body.bucket}, #{body.objectKey}, #{body.storageUrl}, coalesce(#{body.storageCategory}, #{body.category}))
             """)
     void insertAttachment(@Param("attachmentId") String attachmentId, @Param("taskId") String taskId, @Param("body") FileMetadataRequest body);
+
+    @Update("update kpm_task_attachments set del_flag=1, update_time=current_timestamp where task_id=#{taskId} and id=#{attachmentId} and del_flag=0")
+    void deleteAttachment(@Param("taskId") String taskId, @Param("attachmentId") String attachmentId);
 }
+

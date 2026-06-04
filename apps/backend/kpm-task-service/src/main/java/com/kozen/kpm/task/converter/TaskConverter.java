@@ -1,5 +1,6 @@
 package com.kozen.kpm.task.converter;
 
+import com.kozen.kpm.common.util.JsonUtil;
 import com.kozen.kpm.task.dto.TaskAttachmentDto;
 import com.kozen.kpm.task.dto.TaskCommentDto;
 import com.kozen.kpm.task.dto.TaskDto;
@@ -71,7 +72,7 @@ public class TaskConverter {
                 comment.getTaskId(),
                 comment.getAuthor(),
                 comment.getContent(),
-                comment.getAttachments(),
+                comment.getAttachments() == null ? List.of() : JsonUtil.fromJson(comment.getAttachments()),
                 comment.getCreatedAt()
         );
     }

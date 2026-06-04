@@ -15,6 +15,7 @@ import com.kozen.kpm.project.dto.RequirementDto;
 import com.kozen.kpm.project.dto.RequirementOverviewDto;
 import com.kozen.kpm.project.dto.RequirementRequest;
 import com.kozen.kpm.project.dto.StageRecordRequest;
+import com.kozen.kpm.project.dto.StageAssigneesRequest;
 import com.kozen.kpm.project.dto.StageStatusRequest;
 
 import java.util.List;
@@ -42,6 +43,9 @@ public interface ProjectService {
 
     /** Update stage status and sync the derived project status. */
     ProjectDto updateStage(String stageId, StageStatusRequest request);
+
+    /** Replace all assignees of one project stage. */
+    ProjectDto replaceStageAssignees(String stageId, StageAssigneesRequest request);
 
     /** Replace all project members. */
     ProjectDto replaceMembers(String id, ProjectMembersRequest request);

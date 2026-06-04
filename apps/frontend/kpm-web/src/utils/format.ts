@@ -19,6 +19,17 @@ export function dateTimeText(value?: string | null): string {
   return String(value).replace('T', ' ').slice(0, 16);
 }
 
+
+export function dateValue(value?: string | null): number {
+  if (!value) return 0;
+  const timestamp = new Date(value).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+export function compareDateDesc(a?: string | null, b?: string | null): number {
+  return dateValue(b) - dateValue(a);
+}
+
 export function moneyText(amount?: number | string | null, currency = 'USD'): string {
   const numeric = Number(amount ?? 0);
   return `${currency || 'USD'} ${numeric.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
@@ -91,6 +102,20 @@ export function isClosedTaskStatus(status?: unknown): boolean {
   const raw = String(status ?? '').trim();
   if (!raw) return false;
   return closedTaskStatuses.has(raw) || closedTaskStatuses.has(raw.toUpperCase());
+}
+
+
+const completedTaskStatuses = new Set([
+  '已完成',
+  '完成',
+  'DONE',
+  'CLOSED',
+]);
+
+export function isCompletedTaskStatus(status?: unknown): boolean {
+  const raw = String(status ?? '').trim();
+  if (!raw) return false;
+  return completedTaskStatuses.has(raw) || completedTaskStatuses.has(raw.toUpperCase());
 }
 
 export function isAssignedToUser(assignees: unknown, currentUserName: string): boolean {

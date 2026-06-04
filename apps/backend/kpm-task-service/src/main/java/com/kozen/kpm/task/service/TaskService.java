@@ -27,4 +27,6 @@ public interface TaskService {
     TaskDto addComment(String id, TaskCommentRequest request);
     /** Add one task attachment record. */
     TaskDto addAttachment(String id, FileMetadataRequest request);
+    /** Logically delete one task attachment record. */
+    TaskDto deleteAttachment(String id, String attachmentId);
 }

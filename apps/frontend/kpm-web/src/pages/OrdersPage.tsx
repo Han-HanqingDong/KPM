@@ -14,7 +14,7 @@ import { useKpmData, useRefreshKpmData } from '../hooks/useKpmData';
 import { confirmSubmit } from '../hooks/useConfirmingForm';
 import { kpmApi } from '../services/kpmApi';
 import type { AnyRecord, Order } from '../types';
-import { dateText, includesKeyword, moneyText } from '../utils/format';
+import { compareDateDesc, dateText, dateValue, includesKeyword, moneyText } from '../utils/format';
 import { validationRules } from '../validation';
 
 const currencyOptions = ['USD', 'CNY', 'EUR', 'GBP', 'JPY'].map((value) => ({ label: value, value }));
@@ -33,14 +33,16 @@ export function OrdersPage() {
   const selectedProject = (data?.projects || []).find((project) => project.id === projectId);
   const skuOptions = (selectedProject?.skus || []).map((sku) => ({ label: `${sku.wholeMachinePartNumber} · ${sku.configurationName} · ${sku.memoryType}`, value: sku.id }));
 
-  const orders = useMemo(() => (data?.orders || []).filter((order) => {
-    const matchesKeyword = includesKeyword([order.id, order.customerName, order.projectName, order.specification, order.softwareVersion, order.configurationName], filters.keyword);
-    return matchesKeyword
-      && (!filters.status || order.status === filters.status)
-      && (!filters.orderType || (order.orderType || order.type) === filters.orderType)
-      && (!filters.customerId || order.customerId === filters.customerId)
-      && (!filters.projectId || order.projectId === filters.projectId);
-  }), [data?.orders, filters]);
+  const orders = useMemo(() => (data?.orders || [])
+    .filter((order) => {
+      const matchesKeyword = includesKeyword([order.id, order.customerName, order.projectName, order.specification, order.softwareVersion, order.configurationName], filters.keyword);
+      return matchesKeyword
+        && (!filters.status || order.status === filters.status)
+        && (!filters.orderType || (order.orderType || order.type) === filters.orderType)
+        && (!filters.customerId || order.customerId === filters.customerId)
+        && (!filters.projectId || order.projectId === filters.projectId);
+    })
+    .sort((left, right) => compareDateDesc(left.orderDate, right.orderDate) || String(right.id || '').localeCompare(String(left.id || ''))), [data?.orders, filters]);
 
   function openCreate() {
     setEditing(null);
@@ -87,6 +89,7 @@ export function OrdersPage() {
             dataSource={orders}
             pagination={{ pageSize: 12, showSizeChanger: true }}
             columns={[
+              { title: '下单日期', dataIndex: 'orderDate', width: 118, defaultSortOrder: 'descend', sorter: (left, right) => dateValue(left.orderDate) - dateValue(right.orderDate), render: dateText },
               { title: '客户', dataIndex: 'customerName', width: 150, ellipsis: true },
               { title: '项目', dataIndex: 'projectName', width: 150, ellipsis: true },
               { title: '类型', render: (_, row) => <Tag>{row.orderType || row.type || '-'}</Tag>, width: 110 },
@@ -94,7 +97,7 @@ export function OrdersPage() {
               { title: 'SKU', width: 180, ellipsis: true, render: (_, row) => row.configurationName || row.wholeMachinePartNumber || '-' },
               { title: '数量', dataIndex: 'quantity', width: 80 },
               { title: '金额', width: 130, render: (_, row) => moneyText(row.amount, row.currency) },
-              { title: '期望发货', dataIndex: 'expectedShipDate', width: 120, render: dateText },
+              { title: '期望发货', dataIndex: 'expectedShipDate', width: 120, sorter: (left, right) => dateValue(left.expectedShipDate) - dateValue(right.expectedShipDate), render: dateText },
               { title: '操作', width: 112, fixed: 'right', render: (_, row) => <ActionButtons onView={() => setDetail(row)} onEdit={() => openEdit(row)} onDelete={() => kpmApi.deleteOrder(row.id).then(() => { message.success('订单已删除'); refresh(); })} /> },
             ]}
           />

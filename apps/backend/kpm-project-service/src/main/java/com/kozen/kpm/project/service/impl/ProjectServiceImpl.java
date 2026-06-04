@@ -28,6 +28,7 @@ import com.kozen.kpm.project.dto.RequirementRequest;
 import com.kozen.kpm.project.dto.RequirementTaskWriteCommand;
 import com.kozen.kpm.project.dto.RequirementWriteCommand;
 import com.kozen.kpm.project.dto.StageAssigneeRequest;
+import com.kozen.kpm.project.dto.StageAssigneesRequest;
 import com.kozen.kpm.project.dto.StageRecordRequest;
 import com.kozen.kpm.project.dto.StageStatusRequest;
 import com.kozen.kpm.project.entity.ProcessTemplateEntity;
@@ -108,6 +109,15 @@ public class ProjectServiceImpl implements ProjectService {
         projectMapper.updateStageStatus(stageId, request.status());
         ProjectStageEntity stage = requireStage(stageId);
         syncProjectStatus(stage.getProjectId());
+        return detail(stage.getProjectId());
+    }
+
+    @Override
+    @Transactional
+    public ProjectDto replaceStageAssignees(String stageId, StageAssigneesRequest request) {
+        ProjectStageEntity stage = requireStage(stageId);
+        projectMapper.deleteStageAssignees(stageId);
+        insertStageAssignees(stageId, request.safeAssignees());
         return detail(stage.getProjectId());
     }
 

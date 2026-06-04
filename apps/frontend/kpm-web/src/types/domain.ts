@@ -66,6 +66,8 @@ export type Project = {
   unsellableReason?: string;
   description?: string;
   archived?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
   members?: ProjectMember[];
   stages?: ProjectStage[];
   skus?: ProjectSku[];

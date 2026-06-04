@@ -16,6 +16,7 @@ import com.kozen.kpm.project.dto.RequirementDto;
 import com.kozen.kpm.project.dto.RequirementOverviewDto;
 import com.kozen.kpm.project.dto.RequirementRequest;
 import com.kozen.kpm.project.dto.StageRecordRequest;
+import com.kozen.kpm.project.dto.StageAssigneesRequest;
 import com.kozen.kpm.project.dto.StageStatusRequest;
 import com.kozen.kpm.project.service.ProjectService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -72,6 +73,12 @@ public class ProjectApiController {
     @Operation(summary = "修改阶段状态", description = "阶段负责人维护阶段状态后，系统自动同步项目总体状态。")
     public ApiResponse<ProjectDto> updateStage(@PathVariable String stageId, @Valid @RequestBody StageStatusRequest request) {
         return ApiResponse.ok(projectService.updateStage(stageId, request));
+    }
+
+    @PutMapping("/stages/{stageId}/assignees")
+    @Operation(summary = "替换阶段负责人", description = "在项目详情或阶段详情中维护阶段负责人，负责人必须从已有用户中选择。")
+    public ApiResponse<ProjectDto> replaceStageAssignees(@PathVariable String stageId, @Valid @RequestBody StageAssigneesRequest request) {
+        return ApiResponse.ok(projectService.replaceStageAssignees(stageId, request));
     }
 
     @PutMapping("/{id}/members")

@@ -42,4 +42,7 @@ public class TaskApiController {
     @PostMapping("/{id}/attachments")
     @Operation(summary = "新增任务附件")
     public ApiResponse<TaskDto> addAttachment(@PathVariable String id, @Valid @RequestBody FileMetadataRequest request) { return ApiResponse.ok(taskService.addAttachment(id, request)); }
+    @DeleteMapping("/{id}/attachments/{attachmentId}")
+    @Operation(summary = "删除任务附件")
+    public ApiResponse<TaskDto> deleteAttachment(@PathVariable String id, @PathVariable String attachmentId) { return ApiResponse.ok(taskService.deleteAttachment(id, attachmentId)); }
 }

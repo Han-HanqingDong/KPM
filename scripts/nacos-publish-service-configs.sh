@@ -181,8 +181,8 @@ server:
 spring:
   servlet:
     multipart:
-      max-file-size: ${KPM_UPLOAD_MAX_FILE_SIZE:-200MB}
-      max-request-size: ${KPM_UPLOAD_MAX_REQUEST_SIZE:-500MB}
+      max-file-size: ${KPM_UPLOAD_MAX_FILE_SIZE:-500MB}
+      max-request-size: ${KPM_UPLOAD_MAX_REQUEST_SIZE:-520MB}
 kpm:
   service:
     code: file

@@ -12,7 +12,7 @@ import { useKpmData, useRefreshKpmData } from '../hooks/useKpmData';
 import { confirmSubmit } from '../hooks/useConfirmingForm';
 import { kpmApi } from '../services/kpmApi';
 import type { Project } from '../types';
-import { includesKeyword } from '../utils/format';
+import { compareDateDesc, includesKeyword } from '../utils/format';
 import { validationRules } from '../validation';
 
 export function ProjectsPage() {
@@ -26,13 +26,15 @@ export function ProjectsPage() {
   const salesability = Form.useWatch('salesability', form);
 
   const projects = useMemo(() => {
-    return (data?.projects || []).filter((project) => {
-      const matchesKeyword = includesKeyword([project.externalName, project.internalName, project.modelName, project.managerName], filters.keyword);
-      const matchesSalesability = !filters.salesability || project.salesability === filters.salesability;
-      const archived = project.archived === true;
-      const matchesArchived = filters.archived === 'all' || String(archived) === filters.archived;
-      return matchesKeyword && matchesSalesability && matchesArchived;
-    });
+    return (data?.projects || [])
+      .filter((project) => {
+        const matchesKeyword = includesKeyword([project.externalName, project.internalName, project.modelName, project.managerName], filters.keyword);
+        const matchesSalesability = !filters.salesability || project.salesability === filters.salesability;
+        const archived = project.archived === true;
+        const matchesArchived = filters.archived === 'all' || String(archived) === filters.archived;
+        return matchesKeyword && matchesSalesability && matchesArchived;
+      })
+      .sort((left, right) => compareDateDesc(left.createdAt, right.createdAt) || String(right.id || '').localeCompare(String(left.id || '')));
   }, [data?.projects, filters]);
 
   function openCreate() {
