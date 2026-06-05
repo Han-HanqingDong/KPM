@@ -23,7 +23,6 @@ KPM is the product workspace for planning, designing, building, and launching Ko
 | --- | --- |
 | `docs/00-governance/` | Project charter, roadmap, decision log |
 | `docs/01-requirements/` | Requirement intake, PRD, glossary |
-| `docs/02-prototype/` | Product prototype notes and UX artifacts |
 | `docs/03-architecture/` | Technical solution and architecture decisions |
 | `docs/04-development/` | Backlog, implementation notes, test strategy |
 | `docs/05-delivery/` | Deployment, acceptance, release notes |
@@ -31,12 +30,11 @@ KPM is the product workspace for planning, designing, building, and launching Ko
 | `apps/frontend/` | Frontend source code |
 | `infra/` | Infrastructure and environment configuration |
 | `scripts/` | Automation scripts |
-| `assets/` | Shared visual and product assets |
 
 ## Current status
 
-- **Current phase:** Phase 2 — Technical solution
-- **Next milestone:** Confirm the revised Java microservice architecture, with free/open-source components as the default, then produce service/API/database/deployment designs
+- **Current phase:** Phase 3 — Development and integration hardening
+- **Next milestone:** Keep the formal React + Java microservice implementation clean, testable, and ready for trial use.
 
 
 
@@ -47,6 +45,7 @@ To resume KPM in a new conversation, start with:
 - `START-HERE.md`
 - `docs/00-governance/project-state.md`
 - `docs/00-governance/session-handoff.md`
+- `项目介绍.md`
 
 Recommended prompt for a new session:
 

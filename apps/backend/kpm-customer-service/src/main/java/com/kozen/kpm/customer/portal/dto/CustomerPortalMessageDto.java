@@ -13,7 +13,7 @@ public record CustomerPortalMessageDto(
         String projectName,
         String taskId,
         String announcementId,
-        Boolean readFlag,
+        @Schema(description = "是否已读") Boolean read,
         LocalDateTime createdAt,
         LocalDateTime readAt
 ) {}

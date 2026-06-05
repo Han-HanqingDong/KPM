@@ -7,19 +7,23 @@ x-backend-env: &backend-env
   environment:
     KPM_DB_HOST: postgres
     KPM_DB_PORT: 5432
+    KPM_VALKEY_HOST: valkey
+    KPM_VALKEY_PORT: 6379
     KPM_NACOS_ADDR: nacos:8848
     KPM_NACOS_ENABLED: ${KPM_NACOS_ENABLED:-true}
     KPM_NACOS_CONFIG_ENABLED: ${KPM_NACOS_CONFIG_ENABLED:-true}
     KPM_AUTH_ENABLED: ${KPM_AUTH_ENABLED:-true}
     KPM_RBAC_ENABLED: ${KPM_RBAC_ENABLED:-true}
     KPM_AUTH_TOKEN_SECRET: ${KPM_AUTH_TOKEN_SECRET:-kpm-local-dev-secret-change-me}
-    JAVA_TOOL_OPTIONS: ${KPM_JAVA_TOOL_OPTIONS:--Xms32m -Xmx192m -XX:+UseG1GC}
+    JAVA_TOOL_OPTIONS: ${KPM_JAVA_TOOL_OPTIONS:--Xms32m -Xmx192m -XX:+UseG1GC -Duser.timezone=Asia/Shanghai}
   volumes:
     - ../../../apps/backend:/workspace
     - ../../../.m2:/root/.m2
   working_dir: /workspace
   depends_on:
     postgres:
+      condition: service_healthy
+    valkey:
       condition: service_healthy
     nacos-config-publisher:
       condition: service_completed_successfully
@@ -36,6 +40,8 @@ services:
       POSTGRES_DB: ${KPM_DB_NAME:-kpm}
       POSTGRES_USER: ${KPM_DB_USER:-kpm}
       POSTGRES_PASSWORD: ${KPM_DB_PASSWORD:-kpm_dev_password}
+      TZ: ${KPM_TIMEZONE:-Asia/Shanghai}
+    command: postgres -c timezone=${KPM_DB_TIMEZONE:-Asia/Shanghai}
     ports:
       - "${KPM_DB_PORT:-5432}:5432"
     volumes:
@@ -114,6 +120,8 @@ services:
       KPM_DB_NAME: ${KPM_DB_NAME:-kpm}
       KPM_DB_USER: ${KPM_DB_USER:-kpm}
       KPM_DB_PASSWORD: ${KPM_DB_PASSWORD:-kpm_dev_password}
+      KPM_VALKEY_HOST: ${KPM_VALKEY_HOST:-valkey}
+      KPM_VALKEY_PORT: ${KPM_VALKEY_PORT:-6379}
       KPM_AUTH_TOKEN_SECRET: ${KPM_AUTH_TOKEN_SECRET:-kpm-local-dev-secret-change-me}
       KPM_IAM_URI: http://iam-service:8101
     volumes:
@@ -177,6 +185,8 @@ services:
       KPM_DB_NAME: ${KPM_DB_NAME:-kpm}
       KPM_DB_USER: ${KPM_DB_USER:-kpm}
       KPM_DB_PASSWORD: ${KPM_DB_PASSWORD:-kpm_dev_password}
+      KPM_VALKEY_HOST: valkey
+      KPM_VALKEY_PORT: 6379
       KPM_NACOS_ADDR: nacos:8848
       KPM_NACOS_ENABLED: ${KPM_NACOS_ENABLED:-true}
       KPM_NACOS_CONFIG_ENABLED: ${KPM_NACOS_CONFIG_ENABLED:-true}
@@ -185,7 +195,7 @@ services:
       KPM_AUTH_ENABLED: ${KPM_AUTH_ENABLED:-true}
       KPM_RBAC_ENABLED: ${KPM_RBAC_ENABLED:-true}
       KPM_AUTH_TOKEN_SECRET: ${KPM_AUTH_TOKEN_SECRET:-kpm-local-dev-secret-change-me}
-      JAVA_TOOL_OPTIONS: ${KPM_JAVA_TOOL_OPTIONS:--Xms32m -Xmx192m -XX:+UseG1GC}
+      JAVA_TOOL_OPTIONS: ${KPM_JAVA_TOOL_OPTIONS:--Xms32m -Xmx192m -XX:+UseG1GC -Duser.timezone=Asia/Shanghai}
       KPM_UPLOAD_MAX_FILE_SIZE: ${KPM_UPLOAD_MAX_FILE_SIZE:-500MB}
       KPM_UPLOAD_MAX_REQUEST_SIZE: ${KPM_UPLOAD_MAX_REQUEST_SIZE:-520MB}
     command: sh -lc "cp kpm-file-service/target/kpm-file-service-0.1.0-SNAPSHOT.jar /tmp/kpm-file-service.jar && exec /opt/java/openjdk/bin/java -jar /tmp/kpm-file-service.jar"
@@ -215,6 +225,8 @@ services:
       KPM_DB_NAME: ${KPM_DB_NAME:-kpm}
       KPM_DB_USER: ${KPM_DB_USER:-kpm}
       KPM_DB_PASSWORD: ${KPM_DB_PASSWORD:-kpm_dev_password}
+      KPM_VALKEY_HOST: valkey
+      KPM_VALKEY_PORT: 6379
       KPM_NACOS_ADDR: nacos:8848
       KPM_NACOS_ENABLED: ${KPM_NACOS_ENABLED:-true}
       KPM_NACOS_CONFIG_ENABLED: ${KPM_NACOS_CONFIG_ENABLED:-true}
@@ -223,7 +235,7 @@ services:
       KPM_AUTH_ENABLED: ${KPM_AUTH_ENABLED:-true}
       KPM_RBAC_ENABLED: ${KPM_RBAC_ENABLED:-true}
       KPM_AUTH_TOKEN_SECRET: ${KPM_AUTH_TOKEN_SECRET:-kpm-local-dev-secret-change-me}
-      JAVA_TOOL_OPTIONS: ${KPM_JAVA_TOOL_OPTIONS:--Xms32m -Xmx192m -XX:+UseG1GC}
+      JAVA_TOOL_OPTIONS: ${KPM_JAVA_TOOL_OPTIONS:--Xms32m -Xmx192m -XX:+UseG1GC -Duser.timezone=Asia/Shanghai}
       KPM_NOTIFICATION_REFRESH_INTERVAL_SECONDS: ${KPM_NOTIFICATION_REFRESH_INTERVAL_SECONDS:-120}
       KPM_NOTIFICATION_PROCESSOR_INTERVAL_MS: ${KPM_NOTIFICATION_PROCESSOR_INTERVAL_MS:-15000}
       KPM_NOTIFICATION_MAIL_ENABLED: ${KPM_NOTIFICATION_MAIL_ENABLED:-false}
@@ -251,7 +263,7 @@ services:
       KPM_AUTH_ENABLED: ${KPM_AUTH_ENABLED:-true}
       KPM_RBAC_ENABLED: ${KPM_RBAC_ENABLED:-true}
       KPM_AUTH_TOKEN_SECRET: ${KPM_AUTH_TOKEN_SECRET:-kpm-local-dev-secret-change-me}
-      JAVA_TOOL_OPTIONS: ${KPM_JAVA_TOOL_OPTIONS:--Xms32m -Xmx192m -XX:+UseG1GC}
+      JAVA_TOOL_OPTIONS: ${KPM_JAVA_TOOL_OPTIONS:--Xms32m -Xmx192m -XX:+UseG1GC -Duser.timezone=Asia/Shanghai}
     command: sh -lc "cp kpm-gateway/target/kpm-gateway-0.1.0-SNAPSHOT.jar /tmp/kpm-gateway.jar && exec /opt/java/openjdk/bin/java -jar /tmp/kpm-gateway.jar"
 
   frontend:

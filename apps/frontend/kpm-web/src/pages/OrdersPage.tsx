@@ -1,6 +1,7 @@
 import { PlusOutlined } from '@ant-design/icons';
 import { Button, Card, Descriptions, Drawer, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { ActionButtons } from '../components/common/ActionButtons';
 import { CustomerSelect } from '../components/common/CustomerSelect';
@@ -14,7 +15,7 @@ import { useKpmData, useRefreshKpmData } from '../hooks/useKpmData';
 import { confirmSubmit } from '../hooks/useConfirmingForm';
 import { kpmApi } from '../services/kpmApi';
 import type { AnyRecord, Order } from '../types';
-import { compareDateDesc, dateText, dateValue, includesKeyword, moneyText } from '../utils/format';
+import { dateText, dateValue, moneyText } from '../utils/format';
 import { validationRules } from '../validation';
 
 const currencyOptions = ['USD', 'CNY', 'EUR', 'GBP', 'JPY'].map((value) => ({ label: value, value }));
@@ -22,10 +23,12 @@ const currencyOptions = ['USD', 'CNY', 'EUR', 'GBP', 'JPY'].map((value) => ({ la
 export function OrdersPage() {
   const { data, isLoading, error } = useKpmData();
   const refresh = useRefreshKpmData();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const [form] = Form.useForm();
   const [filters, setFilters] = useState({ keyword: '', status: undefined as string | undefined, orderType: undefined as string | undefined, customerId: searchParams.get('customerId') || undefined, projectId: searchParams.get('projectId') || undefined });
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 12 });
   const [editing, setEditing] = useState<Order | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [detail, setDetail] = useState<Order | null>(null);
@@ -35,18 +38,29 @@ export function OrdersPage() {
 
   useEffect(() => {
     setFilters((prev) => ({ ...prev, customerId: searchParams.get('customerId') || undefined, projectId: searchParams.get('projectId') || undefined }));
+    setPagination((prev) => ({ ...prev, current: 1 }));
   }, [searchParams]);
 
-  const orders = useMemo(() => (data?.orders || [])
-    .filter((order) => {
-      const matchesKeyword = includesKeyword([order.id, order.customerName, order.projectName, order.specification, order.softwareVersion, order.configurationName], filters.keyword);
-      return matchesKeyword
-        && (!filters.status || order.status === filters.status)
-        && (!filters.orderType || (order.orderType || order.type) === filters.orderType)
-        && (!filters.customerId || order.customerId === filters.customerId)
-        && (!filters.projectId || order.projectId === filters.projectId);
-    })
-    .sort((left, right) => compareDateDesc(left.orderDate, right.orderDate) || String(right.id || '').localeCompare(String(left.id || ''))), [data?.orders, filters]);
+  const orderPageQuery = useQuery({
+    queryKey: ['kpm', 'orders-page', filters, pagination.current, pagination.pageSize],
+    queryFn: () => kpmApi.ordersPage({
+      keyword: filters.keyword,
+      status: filters.status,
+      orderType: filters.orderType,
+      customerId: filters.customerId,
+      projectId: filters.projectId,
+      page: pagination.current,
+      pageSize: pagination.pageSize,
+    }),
+    placeholderData: (previous) => previous,
+    staleTime: 10_000,
+  });
+  const orders = orderPageQuery.data?.items || [];
+
+  function refreshOrderPage() {
+    refresh();
+    queryClient.invalidateQueries({ queryKey: ['kpm', 'orders-page'] });
+  }
 
   function openCreate() {
     setEditing(null);
@@ -61,6 +75,11 @@ export function OrdersPage() {
     setModalOpen(true);
   }
 
+  async function openDetail(order: Order) {
+    const full = await kpmApi.order(order.id);
+    setDetail(full);
+  }
+
   async function submitOrder() {
     const values = await form.validateFields();
     const payload = { ...values, creator: values.creator || user?.name || user?.account, modifier: values.modifier || user?.name || user?.account };
@@ -70,20 +89,20 @@ export function OrdersPage() {
       message.success(editing ? '订单已更新' : '订单已创建');
       setModalOpen(false);
       form.resetFields();
-      refresh();
+      refreshOrderPage();
     });
   }
 
   return (
     <PageScaffold title="订单管理" subtitle="管理客户订单、SKU 快照、发货状态与修改记录。" extra={<Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新增订单</Button>}>
-      <DataState loading={isLoading} error={error}>
+      <DataState loading={isLoading || orderPageQuery.isLoading} error={error || orderPageQuery.error}>
         <Card className="kpm-card kpm-filter-card">
           <Space wrap>
-            <Input.Search allowClear placeholder="搜索订单 / 客户 / 项目 / 规格" onSearch={(keyword) => setFilters((prev) => ({ ...prev, keyword }))} onChange={(e) => setFilters((prev) => ({ ...prev, keyword: e.target.value }))} />
-            <EnumSelect bootstrap={data?.bootstrap} enumType="order_type" placeholder="订单类型" value={filters.orderType} onChange={(orderType) => setFilters((prev) => ({ ...prev, orderType }))} style={{ width: 160 }} />
-            <EnumSelect bootstrap={data?.bootstrap} enumType="order_status" placeholder="订单状态" value={filters.status} onChange={(status) => setFilters((prev) => ({ ...prev, status }))} style={{ width: 160 }} />
-            <CustomerSelect customers={data?.customers} placeholder="客户" value={filters.customerId} onChange={(customerId) => setFilters((prev) => ({ ...prev, customerId }))} style={{ width: 220 }} />
-            <ProjectSelect projects={data?.projects} placeholder="项目" value={filters.projectId} onChange={(nextProjectId) => setFilters((prev) => ({ ...prev, projectId: nextProjectId }))} style={{ width: 220 }} />
+            <Input.Search allowClear placeholder="搜索订单 / 客户 / 项目 / 规格" onSearch={(keyword) => { setPagination((prev) => ({ ...prev, current: 1 })); setFilters((prev) => ({ ...prev, keyword })); }} onChange={(e) => { setPagination((prev) => ({ ...prev, current: 1 })); setFilters((prev) => ({ ...prev, keyword: e.target.value })); }} />
+            <EnumSelect bootstrap={data?.bootstrap} enumType="order_type" placeholder="订单类型" value={filters.orderType} onChange={(orderType) => { setPagination((prev) => ({ ...prev, current: 1 })); setFilters((prev) => ({ ...prev, orderType })); }} style={{ width: 160 }} />
+            <EnumSelect bootstrap={data?.bootstrap} enumType="order_status" placeholder="订单状态" value={filters.status} onChange={(status) => { setPagination((prev) => ({ ...prev, current: 1 })); setFilters((prev) => ({ ...prev, status })); }} style={{ width: 160 }} />
+            <CustomerSelect customers={data?.customers} placeholder="客户" value={filters.customerId} onChange={(customerId) => { setPagination((prev) => ({ ...prev, current: 1 })); setFilters((prev) => ({ ...prev, customerId })); }} style={{ width: 220 }} />
+            <ProjectSelect projects={data?.projects} placeholder="项目" value={filters.projectId} onChange={(nextProjectId) => { setPagination((prev) => ({ ...prev, current: 1 })); setFilters((prev) => ({ ...prev, projectId: nextProjectId })); }} style={{ width: 220 }} />
           </Space>
         </Card>
         <Card className="kpm-card">
@@ -91,7 +110,7 @@ export function OrdersPage() {
             size="small"
             rowKey="id"
             dataSource={orders}
-            pagination={{ pageSize: 12, showSizeChanger: true }}
+            pagination={{ current: pagination.current, pageSize: pagination.pageSize, total: orderPageQuery.data?.total || 0, showSizeChanger: true, onChange: (current, pageSize) => setPagination({ current, pageSize }) }}
             columns={[
               { title: '下单日期', dataIndex: 'orderDate', width: 118, defaultSortOrder: 'descend', sorter: (left, right) => dateValue(left.orderDate) - dateValue(right.orderDate), render: dateText },
               { title: '客户', dataIndex: 'customerName', width: 150, ellipsis: true },
@@ -102,7 +121,7 @@ export function OrdersPage() {
               { title: '数量', dataIndex: 'quantity', width: 80 },
               { title: '金额', width: 130, render: (_, row) => moneyText(row.amount, row.currency) },
               { title: '期望发货', dataIndex: 'expectedShipDate', width: 120, sorter: (left, right) => dateValue(left.expectedShipDate) - dateValue(right.expectedShipDate), render: dateText },
-              { title: '操作', width: 112, fixed: 'right', render: (_, row) => <ActionButtons onView={() => setDetail(row)} onEdit={() => openEdit(row)} onDelete={() => kpmApi.deleteOrder(row.id).then(() => { message.success('订单已删除'); refresh(); })} /> },
+              { title: '操作', width: 112, fixed: 'right', render: (_, row) => <ActionButtons onView={() => openDetail(row)} onEdit={() => openEdit(row)} onDelete={() => kpmApi.deleteOrder(row.id).then(() => { message.success('订单已删除'); refreshOrderPage(); })} /> },
             ]}
           />
         </Card>

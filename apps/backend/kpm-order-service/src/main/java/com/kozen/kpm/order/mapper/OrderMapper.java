@@ -117,6 +117,67 @@ public interface OrderMapper {
     @Select("""
             <script>
             select ${columns}
+            from kpm_orders o
+            join kpm_customers c on c.id=o.customer_id and c.del_flag=0
+            join kpm_projects p on p.id=o.project_id and p.del_flag=0
+            left join kpm_project_skus ps on ps.id=o.sku_id and ps.del_flag=0
+            where (#{startDate,jdbcType=DATE} is null or o.order_date &gt;= #{startDate,jdbcType=DATE})
+              and (#{endDate,jdbcType=DATE} is null or o.order_date &lt; #{endDate,jdbcType=DATE})
+              and (nullif(#{customerId}, '') is null or o.customer_id = nullif(#{customerId}, '')::bigint)
+              and (nullif(#{projectId}, '') is null or o.project_id = nullif(#{projectId}, '')::bigint)
+              and (#{orderType} = '' or o.order_type = #{orderType})
+              and (#{status} = '' or o.status = #{status})
+              and (#{keywordLike} = '' or o.id::text ilike #{keywordLike} or c.name ilike #{keywordLike} or p.external_name ilike #{keywordLike} or o.specification ilike #{keywordLike} or o.software_version ilike #{keywordLike} or ps.configuration_name ilike #{keywordLike} or ps.whole_machine_part_number ilike #{keywordLike})
+              and o.del_flag=0
+            order by o.order_date desc, o.id desc
+            limit #{limit} offset #{offset}
+            </script>
+            """)
+    List<OrderEntity> pageRows(
+            @Param("columns") String columns,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
+            @Param("customerId") String customerId,
+            @Param("projectId") String projectId,
+            @Param("orderType") String orderType,
+            @Param("status") String status,
+            @Param("keywordLike") String keywordLike,
+            @Param("limit") int limit,
+            @Param("offset") int offset
+    );
+
+    default List<OrderEntity> pageRows(LocalDate startDate, LocalDate endDate, String customerId, String projectId, String orderType, String status, String keywordLike, int limit, int offset) {
+        return pageRows(ORDER_SELECT_COLUMNS, startDate, endDate, customerId, projectId, orderType, status, keywordLike, limit, offset);
+    }
+
+    @Select("""
+            select count(1)
+            from kpm_orders o
+            join kpm_customers c on c.id=o.customer_id and c.del_flag=0
+            join kpm_projects p on p.id=o.project_id and p.del_flag=0
+            left join kpm_project_skus ps on ps.id=o.sku_id and ps.del_flag=0
+            where (#{startDate,jdbcType=DATE} is null or o.order_date >= #{startDate,jdbcType=DATE})
+              and (#{endDate,jdbcType=DATE} is null or o.order_date < #{endDate,jdbcType=DATE})
+              and (nullif(#{customerId}, '') is null or o.customer_id = nullif(#{customerId}, '')::bigint)
+              and (nullif(#{projectId}, '') is null or o.project_id = nullif(#{projectId}, '')::bigint)
+              and (#{orderType} = '' or o.order_type = #{orderType})
+              and (#{status} = '' or o.status = #{status})
+              and (#{keywordLike} = '' or o.id::text ilike #{keywordLike} or c.name ilike #{keywordLike} or p.external_name ilike #{keywordLike} or o.specification ilike #{keywordLike} or o.software_version ilike #{keywordLike} or ps.configuration_name ilike #{keywordLike} or ps.whole_machine_part_number ilike #{keywordLike})
+              and o.del_flag=0
+            """)
+    long countRows(
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
+            @Param("customerId") String customerId,
+            @Param("projectId") String projectId,
+            @Param("orderType") String orderType,
+            @Param("status") String status,
+            @Param("keywordLike") String keywordLike
+    );
+
+    @Select("""
+            <script>
+            select ${columns}
             from kpm_orders o join kpm_customers c on c.id=o.customer_id join kpm_projects p on p.id=o.project_id
             left join kpm_project_skus ps on ps.id=o.sku_id
             where o.id=#{id}

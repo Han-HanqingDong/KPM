@@ -1,5 +1,6 @@
 package com.kozen.kpm.customer.service;
 
+import com.kozen.kpm.common.api.PageResult;
 import com.kozen.kpm.common.dto.FileMetadataRequest;
 import com.kozen.kpm.customer.dto.CustomerContactRequest;
 import com.kozen.kpm.customer.dto.CustomerDto;
@@ -18,6 +19,9 @@ import java.util.List;
 public interface CustomerService {
     /** Query customers by optional keyword and enrich each row with owners and related data. */
     List<CustomerDto> list(String keyword);
+
+    /** Query a paged customer list with keyword filtering inside SQL. */
+    PageResult<CustomerDto> page(String keyword, Integer page, Integer pageSize);
 
     /** Load customer detail including contacts, materials, follow-ups and related projects. */
     CustomerDto detail(String id);

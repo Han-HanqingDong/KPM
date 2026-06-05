@@ -26,7 +26,7 @@
 | 2026-05-15 | Make left-navigation menus permission-controlled | Menus should only appear after configuration grants visibility | Accepted |
 | 2026-05-15 | Add KPM-native task management inspired by Jira | Tasks need to originate both from the task page and from stage details while staying connected to KPM context | Accepted |
 | 2026-05-15 | Keep task management lightweight and focused on daily project-member tasks | The module should support KPM collaboration without trying to replace Jira | Accepted |
-| 2026-05-15 | Separate project salesability from lifecycle-stage progress | A product may have stage activity but still needs a clear business answer about whether it can be sold | Accepted |
+| 2026-05-15 | Separate project salesability from lifecycle-stage progress | A product may have stage activity but still needs a clear business answer about whether it can be sold | Superseded |
 | 2026-05-15 | Add customer requirement lists and a project-level requirement overview | Customer-specific needs should be recorded individually while common needs are abstracted at product level | Accepted |
 | 2026-05-15 | Support requirement creation plus invalidation/deletion actions | Requirement records need a usable lifecycle, not only read-only visibility | Accepted |
 | 2026-05-15 | Prefer requirement invalidation as the normal business action, with deletion reserved for mistaken records | Product history is usually more valuable than silent removal | Accepted |
@@ -78,8 +78,9 @@
 | 2026-05-22 | Auto-create missing customer-project links when an order is created | Orders are strong evidence of an active customer-project relationship, and KPM should not rely on users to maintain that link manually | Accepted |
 | 2026-05-22 | Enter Phase 2 and propose a Java-first modular monolith technical architecture | The prototype is considered broadly acceptable, and technical design should optimize for maintainability, faster delivery, and future HA readiness | Superseded |
 | 2026-05-26 | Derive project status from stage statuses instead of asking the creator to choose it | Project status should reflect actual execution progress: no started stages means not started, any active stage means in progress, all completed means completed | Accepted |
-| 2026-05-26 | Hide unsellable reason when project salesability is sellable | The reason only applies to unsellable products, so showing it for sellable products creates confusing data entry | Accepted |
+| 2026-05-26 | Hide unsellable reason when project salesability is sellable | The reason only applies to unsellable products, so showing it for sellable products creates confusing data entry | Superseded |
 | 2026-05-26 | Require confirmation before publishing stage files to project materials | Publishing makes a stage file reusable at project level and should be intentional | Accepted |
+| 2026-06-04 | Remove project-level status, salesability, and unsellable reason from project master data | Project progress should be represented by stage statuses; customer/product commercial state belongs to the customer-project relationship | Accepted |
 | 2026-05-26 | Revise Phase 2 architecture proposal to controlled Java microservices for 1000 concurrent users | The capacity target increased and Kozen prefers distributed deployment with Nacos-like service/config governance | Proposed |
 | 2026-05-26 | Use free/open-source-first infrastructure choices in the Phase 2 architecture | Kozen wants to avoid unnecessary license fees and commercial dependencies while keeping production options open | Proposed |
 | 2026-05-26 | Use Eclipse Temurin OpenJDK 21 rather than Oracle JDK Java 8 for the new KPM core | Java 8 would force older Spring Boot/Spring Cloud versions and adds support/licensing risk; Java 21 fits the selected Spring Boot 4 / Spring Cloud 2025 stack | Accepted |

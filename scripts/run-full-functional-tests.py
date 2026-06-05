@@ -278,8 +278,6 @@ def run():
             'internalName': f'TA-IN-{STAMP}',
             'modelName': f'TA-MODEL-{STAMP}',
             'managerAccount': 'zhangmin',
-            'salesability': '可销售',
-            'unsellableReason': '设计测试中',
             'description': '自动化测试项目',
             'members': [{'userAccount': 'wanggong', 'role': '硬件项目成员'}],
             'stages': [
@@ -289,15 +287,13 @@ def run():
         })
         cleanup.append(('project', project['id']))
         assert 'status' not in project, project
-        assert project.get('salesability') == '可销售', project
-        assert project.get('unsellableReason') in (None, ''), project.get('unsellableReason')
         members = project.get('members', [])
         assert any(m.get('userAccount') == 'zhangmin' for m in members), members
         context['project'] = project
         context['stage_a'] = project['stages'][0]
         context['stage_b'] = project['stages'][1]
         return f"project={project['id']} members={len(members)} stages={len(project['stages'])}"
-    try_case('PROJ-005/006/008/014', '项目', '新建项目不返回总体状态、可销售隐藏不可销售原因、负责人自动入成员', project_flow, 'P0')
+    try_case('PROJ-005/006/008/014', '项目', '新建项目不返回总体状态、负责人自动入成员', project_flow, 'P0')
 
     def project_stage_status_flow():
         p = context['project']
@@ -515,8 +511,6 @@ def run():
             'internalName': f'TA-ORD-IN-{STAMP}',
             'modelName': f'TA-ORD-MODEL-{STAMP}',
             'managerAccount': 'zhangmin',
-            'salesability': '不可销售',
-            'unsellableReason': '设计测试中',
             'description': '订单状态联动项目',
             'members': [],
             'stages': [{'name': '订单阶段', 'assignees': []}],

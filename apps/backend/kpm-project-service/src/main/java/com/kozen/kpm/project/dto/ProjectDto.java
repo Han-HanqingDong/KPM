@@ -20,5 +20,6 @@ public record ProjectDto(
         List<ProjectStageDto> stages,
         List<ProjectCustomerDto> projectCustomers,
         List<ProjectFileDto> projectMaterials,
-        List<ProjectFileDto> materials
+        List<ProjectFileDto> materials,
+        List<ProjectAnnouncementDto> announcements
 ) {}

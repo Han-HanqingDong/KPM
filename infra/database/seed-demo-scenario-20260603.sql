@@ -1,4 +1,0 @@
--- Deprecated after BIGINT technical primary key migration.
--- The previous demo scenario used string primary keys such as test-project-01 and is intentionally removed.
--- Use infra/database/seed.sql for a clean manual-test database with one administrator account.
--- If demo data is needed again, generate a new scenario with numeric BIGINT-compatible IDs.

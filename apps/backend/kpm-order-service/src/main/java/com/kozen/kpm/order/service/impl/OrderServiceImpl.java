@@ -1,7 +1,9 @@
 package com.kozen.kpm.order.service.impl;
 
+import com.kozen.kpm.common.api.PageResult;
 import com.kozen.kpm.common.util.IdUtil;
 import com.kozen.kpm.common.util.JsonUtil;
+import com.kozen.kpm.common.util.PageParamUtil;
 import com.kozen.kpm.common.util.SqlParamUtil;
 import com.kozen.kpm.common.util.ValidationUtil;
 import com.kozen.kpm.order.converter.OrderConverter;
@@ -42,6 +44,35 @@ public class OrderServiceImpl implements OrderService {
         String p = SqlParamUtil.blankIfAll(projectId);
         DateRange range = orderDateRange(y);
         List<OrderEntity> orders = orderMapper.list(range.startDate(), range.endDate(), c, p);
+        return toDtosWithHistories(orders);
+    }
+
+    @Override
+    public PageResult<OrderDto> page(String keyword, String year, String customerId, String projectId, String orderType, String status, Integer page, Integer pageSize) {
+        int current = PageParamUtil.page(page);
+        int size = PageParamUtil.pageSize(pageSize);
+        DateRange range = orderDateRange(SqlParamUtil.blankIfAll(year));
+        String customer = SqlParamUtil.blankIfAll(customerId);
+        String project = SqlParamUtil.blankIfAll(projectId);
+        String type = SqlParamUtil.blankIfAll(orderType);
+        String st = SqlParamUtil.blankIfAll(status);
+        String like = SqlParamUtil.likeOrBlank(keyword);
+        List<OrderDto> items = orderMapper.pageRows(
+                range.startDate(),
+                range.endDate(),
+                customer,
+                project,
+                type,
+                st,
+                like,
+                size,
+                PageParamUtil.offset(current, size)
+        ).stream().map(orderConverter::toOrderSummaryDto).toList();
+        long total = orderMapper.countRows(range.startDate(), range.endDate(), customer, project, type, st, like);
+        return PageResult.of(items, total, current, size);
+    }
+
+    private List<OrderDto> toDtosWithHistories(List<OrderEntity> orders) {
         if (orders.isEmpty()) {
             return List.of();
         }
@@ -166,7 +197,7 @@ public class OrderServiceImpl implements OrderService {
             return;
         }
         orderMapper.insertNotificationEvent(
-                IdUtil.nanoId("evt"),
+                IdUtil.numericId(),
                 "ORDER_CREATED",
                 orderId,
                 "新订单已创建",

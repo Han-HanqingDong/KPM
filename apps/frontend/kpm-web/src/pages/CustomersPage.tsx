@@ -19,6 +19,7 @@ import {
   message,
 } from "antd";
 import { useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { ActionButtons } from "../components/common/ActionButtons";
 import { DataState } from "../components/common/DataState";
@@ -38,7 +39,7 @@ import {
   normalizeUploadFiles,
   uploadBusinessFiles,
 } from "../utils/fileUpload";
-import { dateTimeText, includesKeyword } from "../utils/format";
+import { dateTimeText } from "../utils/format";
 import { validationRules } from "../validation";
 
 function uploadFileList(event: AnyRecord) {
@@ -56,6 +57,7 @@ function beforeUpload(file: File) {
 export function CustomersPage() {
   const { data, isLoading, error } = useKpmData();
   const refresh = useRefreshKpmData();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [form] = Form.useForm();
@@ -72,31 +74,25 @@ export function CustomersPage() {
   const [followupModal, setFollowupModal] = useState(false);
   const [materialModal, setMaterialModal] = useState(false);
   const [notificationModal, setNotificationModal] = useState(false);
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 12 });
+  const customerPageQuery = useQuery({
+    queryKey: ["kpm", "customers-page", keyword, pagination.current, pagination.pageSize],
+    queryFn: () =>
+      kpmApi.customersPage({
+        keyword,
+        page: pagination.current,
+        pageSize: pagination.pageSize,
+      }),
+    placeholderData: (previous) => previous,
+    staleTime: 10_000,
+  });
+  const customers = customerPageQuery.data?.items || [];
+  const activeCustomer = useMemo(() => detail, [detail]);
 
-  const customers = useMemo(
-    () =>
-      (data?.customers || []).filter((customer) =>
-        includesKeyword(
-          [
-            customer.name,
-            customer.shortName,
-            customer.region,
-            customer.address,
-          ],
-          keyword,
-        ),
-      ),
-    [data?.customers, keyword],
-  );
-  const activeCustomer = useMemo(
-    () =>
-      detail
-        ? (data?.customers || []).find(
-            (customer) => customer.id === detail.id,
-          ) || detail
-        : null,
-    [data?.customers, detail],
-  );
+  function refreshCustomerPage() {
+    refresh();
+    queryClient.invalidateQueries({ queryKey: ["kpm", "customers-page"] });
+  }
   const operatorName = user?.name || user?.account || "当前用户";
 
   function openCreate() {
@@ -111,6 +107,11 @@ export function CustomersPage() {
     setModalOpen(true);
   }
 
+  async function openDetail(customer: Customer) {
+    const full = await kpmApi.customer(customer.id);
+    setDetail(full);
+  }
+
   async function submitCustomer() {
     const values = await form.validateFields();
     confirmSubmit(editing ? "确认修改客户？" : "确认新增客户？", async () => {
@@ -119,14 +120,15 @@ export function CustomersPage() {
       message.success(editing ? "客户已更新" : "客户已创建");
       setModalOpen(false);
       form.resetFields();
-      refresh();
+      refreshCustomerPage();
     });
   }
 
   async function addContact() {
     if (!detail) return;
     const values = await contactForm.validateFields();
-    await kpmApi.addCustomerContact(detail.id, values);
+    const updated = await kpmApi.addCustomerContact(detail.id, values);
+    setDetail(updated as Customer);
     message.success("联系人已添加");
     setContactModal(false);
     contactForm.resetFields();
@@ -145,11 +147,12 @@ export function CustomersPage() {
           operatorName,
         )
       : [];
-    await kpmApi.addCustomerFollowup(activeCustomer.id, {
+    const updated = await kpmApi.addCustomerFollowup(activeCustomer.id, {
       author: operatorName,
       content: values.content,
       attachments,
     });
+    setDetail(updated as Customer);
     message.success("跟进记录已添加");
     setFollowupModal(false);
     followupForm.resetFields();
@@ -194,11 +197,13 @@ export function CustomersPage() {
       activeCustomer.id,
       operatorName,
     );
-    await Promise.all(
+    const updatedRows = await Promise.all(
       materials.map((material) =>
         kpmApi.addCustomerMaterial(activeCustomer.id, material),
       ),
     );
+    const latest = updatedRows.at(-1);
+    if (latest) setDetail(latest as Customer);
     message.success("客户资料已上传");
     setMaterialModal(false);
     materialForm.resetFields();
@@ -215,13 +220,13 @@ export function CustomersPage() {
         </Button>
       }
     >
-      <DataState loading={isLoading} error={error}>
+      <DataState loading={isLoading || customerPageQuery.isLoading} error={error || customerPageQuery.error}>
         <Card className="kpm-card kpm-filter-card">
           <Input.Search
             allowClear
             placeholder="搜索客户 / 地区 / 地址"
-            onSearch={setKeyword}
-            onChange={(e) => setKeyword(e.target.value)}
+            onSearch={(nextKeyword) => { setPagination((prev) => ({ ...prev, current: 1 })); setKeyword(nextKeyword); }}
+            onChange={(e) => { setPagination((prev) => ({ ...prev, current: 1 })); setKeyword(e.target.value); }}
             style={{ maxWidth: 360 }}
           />
         </Card>
@@ -230,7 +235,7 @@ export function CustomersPage() {
             size="small"
             rowKey="id"
             dataSource={customers}
-            pagination={{ pageSize: 12, showSizeChanger: true }}
+            pagination={{ current: pagination.current, pageSize: pagination.pageSize, total: customerPageQuery.data?.total || 0, showSizeChanger: true, onChange: (current, pageSize) => setPagination({ current, pageSize }) }}
             columns={[
               {
                 title: "客户名称",
@@ -240,7 +245,7 @@ export function CustomersPage() {
                   <button
                     className="link-button truncate"
                     type="button"
-                    onClick={() => setDetail(row)}
+                    onClick={() => openDetail(row)}
                   >
                     {name}
                   </button>
@@ -305,7 +310,7 @@ export function CustomersPage() {
                     onDelete={() =>
                       kpmApi.deleteCustomer(row.id).then(() => {
                         message.success("客户已删除");
-                        refresh();
+                        refreshCustomerPage();
                       })
                     }
                   />

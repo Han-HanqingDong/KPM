@@ -1,11 +1,15 @@
 import type { ApiResponse } from "../types/api";
 import { resolveApiUrl } from "../api/httpClient";
+import type { KnowledgeArticle, PageResult } from "../types";
 import type {
   CustomerPortalCodeResponse,
+  CustomerPortalContact,
   CustomerPortalData,
   CustomerPortalDownloadResult,
   CustomerPortalLoginResponse,
+  CustomerPortalMaterial,
   CustomerPortalMessage,
+  CustomerPortalTaskStats,
   CustomerPortalTask,
   CustomerPortalTaskCommentPage,
   CustomerPortalTaskCommentRequest,
@@ -179,6 +183,46 @@ export const customerPortalApi = {
     request<CustomerPortalUser>("/api/customer-portal/me", undefined, token),
   data: (token = readCustomerPortalToken()) =>
     request<CustomerPortalData>("/api/customer-portal/data", undefined, token),
+  contacts: (token = readCustomerPortalToken()) =>
+    request<CustomerPortalContact[]>("/api/customer-portal/contacts", undefined, token),
+  materialsPage: (
+    params: {
+      projectId?: string;
+      keyword?: string;
+      page?: number;
+      pageSize?: number;
+    } = {},
+    token = readCustomerPortalToken(),
+  ) => {
+    const search = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === "") return;
+      search.set(key, String(value));
+    });
+    const query = search.toString();
+    return request<PageResult<CustomerPortalMaterial>>(
+      `/api/customer-portal/materials/page${query ? `?${query}` : ""}`,
+      undefined,
+      token,
+    );
+  },
+  knowledgePage: (
+    keyword = "",
+    page = 1,
+    pageSize = 10,
+    token = readCustomerPortalToken(),
+  ) =>
+    request<PageResult<KnowledgeArticle>>(
+      `/api/customer-portal/knowledge/page?keyword=${encodeURIComponent(keyword)}&page=${page}&pageSize=${pageSize}`,
+      undefined,
+      token,
+    ),
+  knowledgeArticle: (id: string, token = readCustomerPortalToken()) =>
+    request<KnowledgeArticle>(
+      `/api/customer-portal/knowledge/${encodeURIComponent(id)}`,
+      undefined,
+      token,
+    ),
   createTask: (
     body: CustomerPortalTaskRequest,
     token = readCustomerPortalToken(),
@@ -186,6 +230,52 @@ export const customerPortalApi = {
     request<CustomerPortalTask>(
       "/api/customer-portal/tasks",
       { method: "POST", body: JSON.stringify(body) },
+      token,
+    ),
+  tasksPage: (
+    params: {
+      projectId?: string;
+      status?: string;
+      creatorEmail?: string;
+      page?: number;
+      pageSize?: number;
+    } = {},
+    token = readCustomerPortalToken(),
+  ) => {
+    const search = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === "") return;
+      search.set(key, String(value));
+    });
+    const query = search.toString();
+    return request<PageResult<CustomerPortalTask>>(
+      `/api/customer-portal/tasks/page${query ? `?${query}` : ""}`,
+      undefined,
+      token,
+    );
+  },
+	  addTaskAttachments: (
+    taskId: string,
+    attachments: AnyRecord[],
+    token = readCustomerPortalToken(),
+  ) =>
+    request<CustomerPortalTask>(
+      `/api/customer-portal/tasks/${taskId}/attachments`,
+      { method: "POST", body: JSON.stringify({ attachments }) },
+      token,
+    ),
+  task: (taskId: string, token = readCustomerPortalToken()) =>
+    request<CustomerPortalTask>(
+      `/api/customer-portal/tasks/${taskId}`,
+      undefined,
+      token,
+    ),
+  taskStatuses: (token = readCustomerPortalToken()) =>
+    request<string[]>("/api/customer-portal/tasks/statuses", undefined, token),
+  taskStats: (projectId?: string, token = readCustomerPortalToken()) =>
+    request<CustomerPortalTaskStats>(
+      `/api/customer-portal/tasks/stats${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ""}`,
+      undefined,
       token,
     ),
   taskComments: (

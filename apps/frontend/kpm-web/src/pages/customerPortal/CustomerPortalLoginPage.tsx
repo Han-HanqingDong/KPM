@@ -30,6 +30,8 @@ export function CustomerPortalLoginPage() {
       const result = await customerPortalApi.requestCode(email);
       setDebugCode(result.debugCode || '');
       message.success(result.message || '验证码已发送');
+    } catch {
+      message.error(t('login.invalidCredentials'));
     } finally {
       setSending(false);
     }
@@ -42,6 +44,8 @@ export function CustomerPortalLoginPage() {
       persistCustomerPortalSession(result);
       message.success(`欢迎 ${result.user.contactName || result.user.customerName}`);
       navigate('/customer-portal', { replace: true });
+    } catch {
+      message.error(t('login.invalidCredentials'));
     } finally {
       setSubmitting(false);
     }
@@ -69,7 +73,7 @@ export function CustomerPortalLoginPage() {
           {['cyan', 'yellow', 'green', 'blue'].map((tone) => <span key={tone} className={`watcher ${tone}`}><i style={eyeStyle} /></span>)}
         </div>
         <Typography.Title level={3}>{t('portalLogin.title')}</Typography.Title>
-        <Typography.Paragraph type="secondary">{t('portalLogin.description')}</Typography.Paragraph>
+        <Typography.Paragraph type="secondary" className="kpm-login-compact-hint">{t('portalLogin.description')}</Typography.Paragraph>
         <Form form={form} layout="vertical" onFinish={handleFinish} requiredMark={false}>
           <Form.Item name="email" label={t('portalLogin.email')} rules={[validationRules.required('请输入联系人邮箱'), validationRules.email()]}>
             <Input prefix={<MailOutlined />} placeholder="contact@example.com" autoComplete="email" />

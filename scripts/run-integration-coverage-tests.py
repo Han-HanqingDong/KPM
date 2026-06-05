@@ -355,7 +355,6 @@ def project_customer_flow() -> str:
         "internalName": f"{RUN_PREFIX}-IN",
         "modelName": f"{RUN_PREFIX}-MODEL",
         "managerAccount": ADMIN_ACCOUNT,
-        "salesability": "可销售",
         "description": "联调测试项目",
         "members": [{"userAccount": ctx.user["email"], "role": "联调成员"}],
         "stages": [
@@ -374,7 +373,6 @@ def project_customer_flow() -> str:
         "internalName": f"{RUN_PREFIX}-IN2",
         "modelName": f"{RUN_PREFIX}-MODEL2",
         "managerAccount": ADMIN_ACCOUNT,
-        "salesability": "可销售",
         "description": "联调测试项目修改",
         "members": [{"userAccount": ctx.user["email"], "role": "联调成员改"}],
         "stages": [{"id": project["stages"][0]["id"], "name": project["stages"][0]["name"], "assignees": [{"type": "user", "account": ADMIN_ACCOUNT}]}],

@@ -61,6 +61,32 @@ public interface CustomerMapper {
                    status,
                    created_at as createdAt,
                    update_time as updatedAt
+            from kpm_customers
+            where del_flag=0
+              and (#{keywordLike} = '' or name ilike #{keywordLike} or short_name ilike #{keywordLike} or region ilike #{keywordLike} or address ilike #{keywordLike})
+            order by created_at desc, id desc
+            limit #{limit} offset #{offset}
+            """)
+    List<CustomerEntity> pageRows(@Param("keywordLike") String keywordLike, @Param("limit") int limit, @Param("offset") int offset);
+
+    @Select("""
+            select count(1)
+            from kpm_customers
+            where del_flag=0
+              and (#{keywordLike} = '' or name ilike #{keywordLike} or short_name ilike #{keywordLike} or region ilike #{keywordLike} or address ilike #{keywordLike})
+            """)
+    long countRows(@Param("keywordLike") String keywordLike);
+
+    @Select("""
+            select id,
+                   name,
+                   short_name as shortName,
+                   region,
+                   address,
+                   level,
+                   status,
+                   created_at as createdAt,
+                   update_time as updatedAt
             from kpm_customers where id=#{id} and del_flag=0
             """)
     CustomerEntity load(@Param("id") String id);

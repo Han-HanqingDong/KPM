@@ -1,6 +1,15 @@
 export type Id = string;
 export type AnyRecord = Record<string, any>;
 
+export type PageResult<T> = {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasNext: boolean;
+};
+
 export type User = {
   id: Id;
   account: string;
@@ -17,7 +26,19 @@ export type User = {
 export type Department = { id: Id; name: string; status?: string; description?: string; active?: boolean; userCount?: number };
 export type Role = { id: Id; name: string; roleType?: string; status?: string; description?: string; permissions?: string[]; active?: boolean; userCount?: number };
 export type Permission = { id?: string; key?: string; code?: string; name: string; type?: string; permissionType?: string; target?: string; location?: string };
-export type EnumItem = { id: Id; enumType: string; name?: string; value: string; semantic?: string; active?: boolean; sortOrder?: number };
+export type EnumItem = {
+  id: Id;
+  enumType: string;
+  name?: string;
+  value: string;
+  labelZh?: string;
+  labelEn?: string;
+  shortLabelZh?: string;
+  shortLabelEn?: string;
+  semantic?: string;
+  active?: boolean;
+  sortOrder?: number;
+};
 export type TaskStatusTransition = { id: Id; fromStatus: string; toStatus: string };
 
 export type BootstrapData = {
@@ -70,6 +91,8 @@ export type Project = {
   projectCustomers?: ProjectCustomer[];
   requirements?: Requirement[];
   materials?: AnyRecord[];
+  projectMaterials?: AnyRecord[];
+  announcements?: AnyRecord[];
 };
 
 export type Customer = {
@@ -144,6 +167,29 @@ export type Order = {
   configurationName?: string;
   memoryType?: string;
   histories?: AnyRecord[];
+};
+
+export type KnowledgeArticle = {
+  id: Id;
+  title: string;
+  symptom: string;
+  rootCause: string;
+  solution?: string;
+  workaround?: string;
+  attachments?: AnyRecord[];
+  status?: string;
+  authorUserId?: string;
+  authorName?: string;
+  publishedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  projectIds?: string[];
+  projectNames?: string[];
+  projectScope?: "PROJECT" | "OTHER" | string;
+  customerIds?: string[];
+  customerNames?: string[];
+  customerScope?: "CUSTOMER" | "ALL" | "INTERNAL" | string;
+  taskIds?: string[];
 };
 
 export type DashboardStats = { projectCount?: number; activeProjectCount?: number; customerCount?: number; openTaskCount?: number; [key: string]: any };

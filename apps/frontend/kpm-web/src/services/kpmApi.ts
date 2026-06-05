@@ -5,8 +5,10 @@ import type {
   BootstrapData,
   Customer,
   DashboardStats,
+  KnowledgeArticle,
   LoginResponse,
   Order,
+  PageResult,
   Project,
   Task,
 } from "../types";
@@ -20,6 +22,22 @@ export const storageKeys = {
   roles: "kpm.currentRoles",
 } as const;
 
+type QueryValue = string | number | boolean | Array<string | number | boolean> | null | undefined;
+
+function queryString(params: Record<string, QueryValue>) {
+  const search = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "") return;
+    if (Array.isArray(value)) {
+      value.filter((item) => item !== "").forEach((item) => search.append(key, String(item)));
+      return;
+    }
+    search.set(key, String(value));
+  });
+  const text = search.toString();
+  return text ? `?${text}` : "";
+}
+
 export const kpmApi = {
   login: (account: string, password: string) =>
     api.post<LoginResponse>("/api/iam/login", { account, password }),
@@ -30,6 +48,8 @@ export const kpmApi = {
   bootstrap: () => api.get<BootstrapData>("/api/resources/bootstrap"),
   dashboard: () => api.get<DashboardStats>("/api/analytics/dashboard"),
   projects: (params = "") => api.get<Project[]>(`/api/projects${params}`),
+  projectsPage: (params: Record<string, QueryValue> = {}) =>
+    api.get<PageResult<Project>>(`/api/projects/page${queryString(params)}`),
   project: (id: string) => api.get<Project>(`/api/projects/${id}`),
   createProject: (body: AnyRecord) => api.post<Project>("/api/projects", body),
   updateProject: (id: string, body: AnyRecord) =>
@@ -59,8 +79,20 @@ export const kpmApi = {
       `/api/projects/${projectId}/materials/${materialId}/public`,
       {},
     ),
+  retractProjectMaterialFromCustomer: (projectId: string, materialId: string) =>
+    api.post<Project>(
+      `/api/projects/${projectId}/materials/${materialId}/retract`,
+      {},
+    ),
+  deleteProjectMaterial: (projectId: string, materialId: string) =>
+    api.delete<Project>(`/api/projects/${projectId}/materials/${materialId}`),
   publishProjectAnnouncement: (projectId: string, body: AnyRecord) =>
     api.post<Project>(`/api/projects/${projectId}/announcements`, body),
+  retractProjectAnnouncement: (projectId: string, announcementId: string) =>
+    api.post<Project>(
+      `/api/projects/${projectId}/announcements/${announcementId}/retract`,
+      {},
+    ),
   projectSkus: (id: string) => api.get<AnyRecord[]>(`/api/projects/${id}/skus`),
   createProjectSku: (id: string, body: AnyRecord) =>
     api.post<AnyRecord>(`/api/projects/${id}/skus`, body),
@@ -99,6 +131,8 @@ export const kpmApi = {
     api.delete<boolean>(`/api/projects/templates/${id}`),
 
   customers: () => api.get<Customer[]>("/api/customers"),
+  customersPage: (params: Record<string, QueryValue> = {}) =>
+    api.get<PageResult<Customer>>(`/api/customers/page${queryString(params)}`),
   customer: (id: string) => api.get<Customer>(`/api/customers/${id}`),
   createCustomer: (body: AnyRecord) =>
     api.post<Customer>("/api/customers", body),
@@ -114,12 +148,31 @@ export const kpmApi = {
   sendCustomerNotification: (id: string, body: AnyRecord) =>
     api.post<AnyRecord>(`/api/customers/${id}/notifications`, body),
 
+  knowledgePage: (params: Record<string, QueryValue> = {}) =>
+    api.get<PageResult<KnowledgeArticle>>(`/api/knowledge/page${queryString(params)}`),
+  knowledgeArticle: (id: string) =>
+    api.get<KnowledgeArticle>(`/api/knowledge/${id}`),
+  createKnowledgeArticle: (body: AnyRecord) =>
+    api.post<KnowledgeArticle>("/api/knowledge", body),
+  updateKnowledgeArticle: (id: string, body: AnyRecord) =>
+    api.put<KnowledgeArticle>(`/api/knowledge/${id}`, body),
+  updateKnowledgeArticleStatus: (id: string, status: string) =>
+    api.post<KnowledgeArticle>(`/api/knowledge/${id}/status`, { status }),
+  deleteKnowledgeArticle: (id: string) =>
+    api.delete<boolean>(`/api/knowledge/${id}`),
+
   tasks: () => api.get<Task[]>("/api/tasks"),
+  tasksPage: (params: Record<string, QueryValue> = {}) =>
+    api.get<PageResult<Task>>(`/api/tasks/page${queryString(params)}`),
   task: (id: string) => api.get<Task>(`/api/tasks/${id}`),
   createTask: (body: AnyRecord) => api.post<Task>("/api/tasks", body),
   updateTask: (id: string, body: AnyRecord) =>
     api.put<Task>(`/api/tasks/${id}`, body),
   deleteTask: (id: string) => api.delete<boolean>(`/api/tasks/${id}`),
+  taskCommentsPage: (id: string, params: Record<string, QueryValue> = {}) =>
+    api.get<PageResult<AnyRecord>>(
+      `/api/tasks/${id}/comments/page${queryString(params)}`,
+    ),
   addTaskComment: (id: string, body: AnyRecord) =>
     api.post<Task>(`/api/tasks/${id}/comments`, body),
   addTaskAttachment: (id: string, body: AnyRecord) =>
@@ -128,6 +181,8 @@ export const kpmApi = {
     api.delete<Task>(`/api/tasks/${id}/attachments/${attachmentId}`),
 
   orders: () => api.get<Order[]>("/api/orders"),
+  ordersPage: (params: Record<string, QueryValue> = {}) =>
+    api.get<PageResult<Order>>(`/api/orders/page${queryString(params)}`),
   order: (id: string) => api.get<Order>(`/api/orders/${id}`),
   createOrder: (body: AnyRecord) => api.post<Order>("/api/orders", body),
   updateOrder: (id: string, body: AnyRecord) =>
@@ -193,6 +248,10 @@ export const kpmApi = {
     api.delete<boolean>(`/api/resources/task-status-transitions/${id}`),
 
   notifications: () => api.get<AnyRecord[]>("/api/notifications/messages"),
+  notificationsPage: (params: Record<string, QueryValue> = {}) =>
+    api.get<PageResult<AnyRecord>>(
+      `/api/notifications/messages/page${queryString(params)}`,
+    ),
   unreadCount: () =>
     api.get<{ count: number }>("/api/notifications/unread-count"),
   markMessageRead: (id: string) =>
@@ -217,10 +276,10 @@ export async function loadAppData(): Promise<AppData> {
   ] = await Promise.all([
     kpmApi.bootstrap(),
     kpmApi.dashboard(),
-    kpmApi.projects(),
-    kpmApi.customers(),
-    kpmApi.tasks(),
-    kpmApi.orders(),
+    kpmApi.projectsPage({ page: 1, pageSize: 50 }),
+    kpmApi.customersPage({ page: 1, pageSize: 100 }),
+    kpmApi.tasksPage({ page: 1, pageSize: 20 }),
+    kpmApi.ordersPage({ page: 1, pageSize: 20 }),
     kpmApi.templates(),
     kpmApi.orderStats(),
     kpmApi.resourceMap(),
@@ -230,10 +289,10 @@ export async function loadAppData(): Promise<AppData> {
   return {
     bootstrap,
     dashboard,
-    projects,
-    customers,
-    tasks,
-    orders,
+    projects: projects.items,
+    customers: customers.items,
+    tasks: tasks.items,
+    orders: orders.items,
     templates,
     orderStats,
     resourceMap,

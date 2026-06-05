@@ -27,6 +27,7 @@ import {
   message,
 } from "antd";
 import { useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ActionButtons } from "../components/common/ActionButtons";
 import { CustomerSelect } from "../components/common/CustomerSelect";
@@ -68,6 +69,7 @@ export function ProjectDetailPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const refresh = useRefreshKpmData();
+  const queryClient = useQueryClient();
   const { data, isLoading, error } = useKpmData();
   const { user, can } = useAuth();
   const [skuForm] = Form.useForm();
@@ -98,10 +100,21 @@ export function ProjectDetailPage() {
   const [projectCustomerKeyword, setProjectCustomerKeyword] = useState("");
   const [announcementModal, setAnnouncementModal] = useState(false);
 
-  const project = useMemo(
-    () => (data?.projects || []).find((item) => item.id === id),
-    [data?.projects, id],
-  );
+  const projectDetailQuery = useQuery({
+    queryKey: ["kpm", "project-detail", id],
+    queryFn: () => kpmApi.project(id),
+    enabled: Boolean(id),
+    staleTime: 10_000,
+  });
+  const project =
+    projectDetailQuery.data ||
+    (data?.projects || []).find((item) => item.id === id);
+
+  function refreshProjectDetail() {
+    refresh();
+    queryClient.invalidateQueries({ queryKey: ["kpm", "project-detail", id] });
+    queryClient.invalidateQueries({ queryKey: ["kpm", "projects-page"] });
+  }
   const activeStage = useMemo(
     () =>
       (project?.stages || []).find((stage) => stage.id === stageDetail?.id) ||
@@ -188,7 +201,7 @@ export function ProjectDetailPage() {
         message.success("SKU 已保存");
         setSkuModal({ open: false });
         skuForm.resetFields();
-        refresh();
+        refreshProjectDetail();
       },
     );
   }
@@ -217,7 +230,7 @@ export function ProjectDetailPage() {
       );
       message.success("项目成员已更新");
       setMemberModal(false);
-      refresh();
+      refreshProjectDetail();
     });
   }
 
@@ -228,7 +241,7 @@ export function ProjectDetailPage() {
       message.success("客户已关联到项目");
       setCustomerModal(false);
       linkForm.resetFields();
-      refresh();
+      refreshProjectDetail();
     });
   }
 
@@ -240,7 +253,7 @@ export function ProjectDetailPage() {
     try {
       await kpmApi.updateStage(stage.id, { status });
       message.success("阶段状态已更新");
-      refresh();
+      refreshProjectDetail();
     } catch (error) {
       message.error(
         error instanceof Error ? error.message : "阶段状态更新失败",
@@ -291,7 +304,7 @@ export function ProjectDetailPage() {
       message.success("阶段负责人已更新");
       setStageAssigneeStage(null);
       stageAssigneeForm.resetFields();
-      refresh();
+      refreshProjectDetail();
     });
   }
 
@@ -317,7 +330,7 @@ export function ProjectDetailPage() {
     message.success("阶段资料已上传");
     setStageMaterialModal(false);
     stageMaterialForm.resetFields();
-    refresh();
+    refreshProjectDetail();
   }
 
   async function submitProjectMaterial() {
@@ -344,7 +357,7 @@ export function ProjectDetailPage() {
     message.success("项目资料已上传");
     setProjectMaterialModal(false);
     projectMaterialForm.resetFields();
-    refresh();
+    refreshProjectDetail();
   }
 
   async function submitStageRecord() {
@@ -367,14 +380,14 @@ export function ProjectDetailPage() {
     message.success("阶段记录已发布");
     setStageRecordModal(false);
     stageRecordForm.resetFields();
-    refresh();
+    refreshProjectDetail();
   }
 
   async function publishStageMaterial(material: AnyRecord) {
     confirmSubmit("确认发布该阶段资料到项目资料区？", async () => {
       await kpmApi.publishStageMaterial(material.id);
       message.success("已发布到项目资料区");
-      refresh();
+      refreshProjectDetail();
     });
   }
 
@@ -384,7 +397,43 @@ export function ProjectDetailPage() {
       async () => {
         await kpmApi.publishProjectMaterialToCustomer(id, material.id);
         message.success("资料已标记为客户可见");
-        refresh();
+        refreshProjectDetail();
+      },
+    );
+  }
+
+  async function retractProjectMaterialFromCustomer(material: AnyRecord) {
+    confirmSubmit(
+      "确认下架该客户可见资料？下架后客户门户将不再展示该文件，内部项目资料仍会保留。",
+      async () => {
+        await kpmApi.retractProjectMaterialFromCustomer(id, material.id);
+        message.success("资料已从客户门户下架");
+        refreshProjectDetail();
+      },
+    );
+  }
+
+  async function deleteProjectMaterial(material: AnyRecord) {
+    confirmSubmit(
+      "确认从项目资料中删除该文件记录？删除后客户门户也将不再展示该资料。",
+      async () => {
+        await kpmApi.deleteProjectMaterial(id, material.id);
+        message.success("项目资料已删除");
+        refreshProjectDetail();
+      },
+    );
+  }
+
+  async function updateProjectCustomerStatus(row: AnyRecord, next?: string) {
+    if (!next || next === row.projectStatus) return;
+    confirmSubmit(
+      `确认将“${row.customerName || row.name || "该客户"}”在本项目下的状态改为“${next}”？`,
+      async () => {
+        await kpmApi.updateProjectCustomerStatus(id, row.customerId, {
+          projectStatus: next,
+        });
+        message.success("客户项目状态已更新");
+        refreshProjectDetail();
       },
     );
   }
@@ -427,7 +476,7 @@ export function ProjectDetailPage() {
     message.success("阶段任务已创建");
     setStageTaskModal(false);
     stageTaskForm.resetFields();
-    refresh();
+    refreshProjectDetail();
   }
 
   function openAnnouncementModal() {
@@ -444,7 +493,18 @@ export function ProjectDetailPage() {
         message.success("公告已发布给关联客户");
         setAnnouncementModal(false);
         announcementForm.resetFields();
-        refresh();
+        refreshProjectDetail();
+      },
+    );
+  }
+
+  async function retractAnnouncement(announcement: AnyRecord) {
+    confirmSubmit(
+      "确认撤回该公告？撤回后客户门户不再滚动展示该公告，但公告历史仍会保留。",
+      async () => {
+        await kpmApi.retractProjectAnnouncement(id, announcement.id);
+        message.success("公告已撤回");
+        refreshProjectDetail();
       },
     );
   }
@@ -463,7 +523,7 @@ export function ProjectDetailPage() {
     message.success("客户需求已新增");
     setRequirementModal(false);
     requirementForm.resetFields();
-    refresh();
+    refreshProjectDetail();
   }
 
   if (!project && !isLoading) {
@@ -495,7 +555,7 @@ export function ProjectDetailPage() {
         </Space>
       }
     >
-      <DataState loading={isLoading} error={error}>
+      <DataState loading={isLoading || projectDetailQuery.isLoading} error={error || projectDetailQuery.error}>
         {project ? (
           <>
             <Card className="kpm-card">
@@ -673,7 +733,7 @@ export function ProjectDetailPage() {
                                     .deleteProjectSku(id, row.id)
                                     .then(() => {
                                       message.success("SKU 已删除");
-                                      refresh();
+                                      refreshProjectDetail();
                                     })
                                 }
                               />
@@ -731,16 +791,7 @@ export function ProjectDetailPage() {
                                 enumType="customer_project_status"
                                 value={value}
                                 onChange={(next) =>
-                                  kpmApi
-                                    .updateProjectCustomerStatus(
-                                      id,
-                                      row.customerId,
-                                      { projectStatus: next },
-                                    )
-                                    .then(() => {
-                                      message.success("客户项目状态已更新");
-                                      refresh();
-                                    })
+                                  updateProjectCustomerStatus(row, next)
                                 }
                               />
                             ),
@@ -871,7 +922,7 @@ export function ProjectDetailPage() {
                           },
                           {
                             title: "操作",
-                            width: 180,
+                            width: 240,
                             render: (_, row: AnyRecord) => (
                               <Space>
                                 <Button
@@ -887,20 +938,115 @@ export function ProjectDetailPage() {
                                 {can(
                                   "button:project-materials:publish-customer",
                                 ) ? (
+                                  row.publicVisible ? (
+                                    <Button
+                                      size="small"
+                                      onClick={() =>
+                                        retractProjectMaterialFromCustomer(row)
+                                      }
+                                    >
+                                      下架
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      size="small"
+                                      type="primary"
+                                      ghost
+                                      onClick={() =>
+                                        publishProjectMaterialToCustomer(row)
+                                      }
+                                    >
+                                      公开
+                                    </Button>
+                                  )
+                                ) : null}
+                                {can("button:project-materials:upload") ? (
                                   <Button
                                     size="small"
-                                    type="primary"
-                                    ghost
-                                    disabled={row.publicVisible}
-                                    onClick={() =>
-                                      publishProjectMaterialToCustomer(row)
-                                    }
+                                    danger
+                                    onClick={() => deleteProjectMaterial(row)}
                                   >
-                                    {row.publicVisible ? "已公开" : "公开"}
+                                    删除
                                   </Button>
                                 ) : null}
                               </Space>
                             ),
+                          },
+                        ]}
+                      />
+                    </Card>
+                  ),
+                },
+                {
+                  key: "announcements",
+                  label: "公告历史",
+                  children: (
+                    <Card className="kpm-card">
+                      <Table
+                        size="small"
+                        rowKey={(row: AnyRecord) => row.id}
+                        dataSource={project.announcements || []}
+                        pagination={{ pageSize: 8, showSizeChanger: true }}
+                        columns={[
+                          {
+                            title: "公告标题",
+                            dataIndex: "title",
+                            ellipsis: true,
+                          },
+                          {
+                            title: "类型",
+                            dataIndex: "announcementType",
+                            width: 130,
+                            render: (value) => <Tag>{value || "普通公告"}</Tag>,
+                          },
+                          {
+                            title: "状态",
+                            dataIndex: "announcementStatus",
+                            width: 100,
+                            render: (value) =>
+                              value === "撤回" ? (
+                                <Tag color="default">已撤回</Tag>
+                              ) : (
+                                <Tag color="success">已发布</Tag>
+                              ),
+                          },
+                          {
+                            title: "发布人",
+                            dataIndex: "publisher",
+                            width: 120,
+                            render: (value) => value || "-",
+                          },
+                          {
+                            title: "发布时间",
+                            dataIndex: "publishedAt",
+                            width: 170,
+                            render: dateTimeText,
+                          },
+                          {
+                            title: "撤回信息",
+                            width: 220,
+                            render: (_, row: AnyRecord) =>
+                              row.announcementStatus === "撤回" ? (
+                                <Typography.Text type="secondary">
+                                  {row.retractedBy || "-"} · {dateTimeText(row.retractedAt)}
+                                </Typography.Text>
+                              ) : (
+                                "-"
+                              ),
+                          },
+                          {
+                            title: "操作",
+                            width: 100,
+                            render: (_, row: AnyRecord) =>
+                              row.announcementStatus === "撤回" ? null : (
+                                <Button
+                                  size="small"
+                                  danger
+                                  onClick={() => retractAnnouncement(row)}
+                                >
+                                  撤回
+                                </Button>
+                              ),
                           },
                         ]}
                       />
@@ -1157,7 +1303,7 @@ export function ProjectDetailPage() {
                               onClick={() =>
                                 kpmApi.voidRequirement(row.id).then(() => {
                                   message.success("需求已作废");
-                                  refresh();
+                                  refreshProjectDetail();
                                 })
                               }
                             >
@@ -1169,7 +1315,7 @@ export function ProjectDetailPage() {
                               onClick={() =>
                                 kpmApi.deleteRequirement(row.id).then(() => {
                                   message.success("需求已删除");
-                                  refresh();
+                                  refreshProjectDetail();
                                 })
                               }
                             >

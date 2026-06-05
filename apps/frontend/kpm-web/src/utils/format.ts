@@ -14,9 +14,27 @@ export function dateText(value?: string | null): string {
   return String(value).slice(0, 10);
 }
 
+function padDatePart(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+function formatLocalDateTime(date: Date): string {
+  return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())} ${padDatePart(date.getHours())}:${padDatePart(date.getMinutes())}`;
+}
+
+function hasExplicitTimezone(value: string): boolean {
+  return /(?:z|[+-]\d{2}:?\d{2})$/i.test(value.trim());
+}
+
 export function dateTimeText(value?: string | null): string {
   if (!value) return '-';
-  return String(value).replace('T', ' ').slice(0, 16);
+  const raw = String(value).trim();
+  if (!raw) return '-';
+  if (hasExplicitTimezone(raw)) {
+    const date = new Date(raw);
+    return Number.isNaN(date.getTime()) ? raw.replace('T', ' ').slice(0, 16) : formatLocalDateTime(date);
+  }
+  return raw.replace('T', ' ').replace(/\.\d+$/, '').slice(0, 16);
 }
 
 
@@ -51,6 +69,27 @@ export function enumValues(items: EnumItem[], enumType: string, fallback: string
     .map((item) => item.value || item.name || '')
     .filter(Boolean);
   return values.length ? values : fallback;
+}
+
+export function isEnglishLanguage(language?: string): boolean {
+  return String(language || '').toLowerCase().startsWith('en');
+}
+
+export function enumDisplayLabel(item: EnumItem | undefined, language?: string): string {
+  if (!item) return '';
+  if (isEnglishLanguage(language)) return item.labelEn || item.name || item.value || '';
+  return item.labelZh || item.name || item.value || '';
+}
+
+export function enumShortLabel(item: EnumItem | undefined, language?: string): string {
+  if (!item) return '';
+  if (isEnglishLanguage(language)) return item.shortLabelEn || firstChar(enumDisplayLabel(item, language)).toUpperCase();
+  return item.shortLabelZh || firstChar(enumDisplayLabel(item, language));
+}
+
+export function firstChar(value?: string | null): string {
+  const textValue = String(value || '').trim();
+  return Array.from(textValue)[0] || '';
 }
 
 export function parseJsonObject(value: unknown): AnyRecord {

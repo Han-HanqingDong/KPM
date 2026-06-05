@@ -1,11 +1,14 @@
 package com.kozen.kpm.task.service.impl;
 
+import com.kozen.kpm.common.api.PageResult;
 import com.kozen.kpm.common.dto.FileMetadataRequest;
 import com.kozen.kpm.common.util.IdUtil;
 import com.kozen.kpm.common.util.JsonUtil;
+import com.kozen.kpm.common.util.PageParamUtil;
 import com.kozen.kpm.common.util.SqlParamUtil;
 import com.kozen.kpm.common.util.ValidationUtil;
 import com.kozen.kpm.task.converter.TaskConverter;
+import com.kozen.kpm.task.dto.TaskCommentDto;
 import com.kozen.kpm.task.dto.TaskCommentRequest;
 import com.kozen.kpm.task.dto.TaskDto;
 import com.kozen.kpm.task.dto.TaskRequest;
@@ -46,7 +49,30 @@ public class TaskServiceImpl implements TaskService {
         String like = SqlParamUtil.likeOrBlank(keyword);
         String st = SqlParamUtil.blankIfAll(status);
         String cat = SqlParamUtil.blankIfAll(category);
-        List<TaskEntity> tasks = taskMapper.list(like, st, cat);
+        return enrichTasks(taskMapper.list(like, st, cat));
+    }
+
+    @Override
+    public PageResult<TaskDto> page(String keyword, String status, String category, String customerId, String projectId, String id, String userId, String assigneeScope, String relationScope, String statusScope, List<String> completedStatuses, Integer page, Integer pageSize) {
+        int current = PageParamUtil.page(page);
+        int size = PageParamUtil.pageSize(pageSize);
+        String like = SqlParamUtil.likeOrBlank(keyword);
+        String st = SqlParamUtil.blankIfAll(status);
+        String cat = SqlParamUtil.blankIfAll(category);
+        String customer = SqlParamUtil.blankIfAll(customerId);
+        String project = SqlParamUtil.blankIfAll(projectId);
+        String taskId = SqlParamUtil.blankIfAll(id);
+        String scopedUserId = SqlParamUtil.blankIfAll(userId);
+        String assignee = SqlParamUtil.blankIfAll(assigneeScope);
+        String relation = SqlParamUtil.blankIfAll(relationScope);
+        String statusScopeValue = SqlParamUtil.blankIfAll(statusScope);
+        List<String> completed = completedStatuses == null ? List.of() : completedStatuses.stream().filter(value -> value != null && !value.isBlank()).toList();
+        List<TaskDto> items = enrichTaskSummaries(taskMapper.pageRows(like, st, cat, customer, project, taskId, scopedUserId, assignee, relation, statusScopeValue, completed, size, PageParamUtil.offset(current, size)));
+        long total = taskMapper.countRows(like, st, cat, customer, project, taskId, scopedUserId, assignee, relation, statusScopeValue, completed);
+        return PageResult.of(items, total, current, size);
+    }
+
+    private List<TaskDto> enrichTasks(List<TaskEntity> tasks) {
         if (tasks.isEmpty()) {
             return List.of();
         }
@@ -68,6 +94,26 @@ public class TaskServiceImpl implements TaskService {
                         participantIds.getOrDefault(task.getId(), List.of()),
                         attachments.getOrDefault(task.getId(), List.of()),
                         comments.getOrDefault(task.getId(), List.of())
+                ))
+                .toList();
+    }
+
+    private List<TaskDto> enrichTaskSummaries(List<TaskEntity> tasks) {
+        if (tasks.isEmpty()) {
+            return List.of();
+        }
+        List<String> taskIds = tasks.stream().map(TaskEntity::getId).toList();
+        Map<String, List<String>> assignees = groupRelatedStrings(taskMapper.assigneesForTasks(taskIds));
+        Map<String, List<String>> assigneeIds = groupRelatedStrings(taskMapper.assigneeIdsForTasks(taskIds));
+        Map<String, List<String>> participants = groupRelatedStrings(taskMapper.participantsForTasks(taskIds));
+        Map<String, List<String>> participantIds = groupRelatedStrings(taskMapper.participantIdsForTasks(taskIds));
+        return tasks.stream()
+                .map(task -> taskConverter.toTaskSummaryDto(
+                        task,
+                        assignees.getOrDefault(task.getId(), List.of()),
+                        assigneeIds.getOrDefault(task.getId(), List.of()),
+                        participants.getOrDefault(task.getId(), List.of()),
+                        participantIds.getOrDefault(task.getId(), List.of())
                 ))
                 .toList();
     }
@@ -133,6 +179,21 @@ public class TaskServiceImpl implements TaskService {
     public boolean delete(String id) {
         taskMapper.deleteById(id);
         return true;
+    }
+
+    @Override
+    public PageResult<TaskCommentDto> comments(String id, Integer page, Integer pageSize) {
+        if (taskMapper.load(id) == null) {
+            throw new IllegalArgumentException("任务不存在");
+        }
+        int current = PageParamUtil.page(page);
+        int size = Math.min(PageParamUtil.pageSize(pageSize), 50);
+        List<TaskCommentDto> items = taskMapper.commentsPage(id, size, PageParamUtil.offset(current, size))
+                .stream()
+                .map(taskConverter::toCommentDto)
+                .toList();
+        long total = taskMapper.commentCount(id);
+        return PageResult.of(items, total, current, size);
     }
 
     @Override
@@ -237,7 +298,7 @@ public class TaskServiceImpl implements TaskService {
             return;
         }
         taskMapper.insertNotificationEvent(
-                IdUtil.nanoId("evt"),
+                IdUtil.numericId(),
                 "TASK_CREATED",
                 taskId,
                 "新任务已分配",

@@ -8,6 +8,7 @@ import com.kozen.kpm.project.dto.ProjectWriteCommand;
 import com.kozen.kpm.project.dto.RequirementTaskWriteCommand;
 import com.kozen.kpm.project.dto.RequirementWriteCommand;
 import com.kozen.kpm.project.entity.ProcessTemplateEntity;
+import com.kozen.kpm.project.entity.ProjectAnnouncementEntity;
 import com.kozen.kpm.project.entity.ProjectCustomerEntity;
 import com.kozen.kpm.project.entity.ProjectEntity;
 import com.kozen.kpm.project.entity.ProjectFileEntity;
@@ -54,6 +55,47 @@ public interface ProjectMapper {
         String trimmed = keyword == null ? null : keyword.trim();
         String like = trimmed == null || trimmed.isBlank() ? "" : "%" + trimmed + "%";
         return list(trimmed, like, archived);
+    }
+
+    @Select("""
+            select id,
+                   external_name as externalName,
+                   internal_name as internalName,
+                   model_name as modelName,
+                   manager_user_id as managerUserId,
+                   manager_account as managerAccount,
+                   archived,
+                   description,
+                   created_at as createdAt,
+                   updated_at as updatedAt
+            from kpm_projects
+            where (cast(#{keyword} as text) is null or #{keyword} = '' or external_name ilike #{keywordLike} or internal_name ilike #{keywordLike} or model_name ilike #{keywordLike})
+              and (cast(#{archived,jdbcType=BOOLEAN} as boolean) is null or archived = #{archived,jdbcType=BOOLEAN})
+              and del_flag=0
+            order by created_at desc, id desc
+            limit #{limit} offset #{offset}
+            """)
+    List<ProjectEntity> pageRows(@Param("keyword") String keyword, @Param("keywordLike") String keywordLike, @Param("archived") Boolean archived, @Param("limit") int limit, @Param("offset") int offset);
+
+    default List<ProjectEntity> pageRows(String keyword, Boolean archived, int limit, int offset) {
+        String trimmed = keyword == null ? null : keyword.trim();
+        String like = trimmed == null || trimmed.isBlank() ? "" : "%" + trimmed + "%";
+        return pageRows(trimmed, like, archived, limit, offset);
+    }
+
+    @Select("""
+            select count(1)
+            from kpm_projects
+            where (cast(#{keyword} as text) is null or #{keyword} = '' or external_name ilike #{keywordLike} or internal_name ilike #{keywordLike} or model_name ilike #{keywordLike})
+              and (cast(#{archived,jdbcType=BOOLEAN} as boolean) is null or archived = #{archived,jdbcType=BOOLEAN})
+              and del_flag=0
+            """)
+    long countRows(@Param("keyword") String keyword, @Param("keywordLike") String keywordLike, @Param("archived") Boolean archived);
+
+    default long countRows(String keyword, Boolean archived) {
+        String trimmed = keyword == null ? null : keyword.trim();
+        String like = trimmed == null || trimmed.isBlank() ? "" : "%" + trimmed + "%";
+        return countRows(trimmed, like, archived);
     }
 
     @Select("""
@@ -329,6 +371,20 @@ public interface ProjectMapper {
             """)
     int markProjectMaterialPublic(@Param("projectId") String projectId, @Param("materialId") String materialId, @Param("operator") String operator);
 
+    @Update("""
+            update kpm_project_materials
+            set public_visible=false, public_at=null, updator=#{operator}, update_time=current_timestamp
+            where id=#{materialId} and project_id=#{projectId} and del_flag=0
+            """)
+    int retractProjectMaterialPublic(@Param("projectId") String projectId, @Param("materialId") String materialId, @Param("operator") String operator);
+
+    @Update("""
+            update kpm_project_materials
+            set del_flag=1, public_visible=false, updator=#{operator}, update_time=current_timestamp
+            where id=#{materialId} and project_id=#{projectId} and del_flag=0
+            """)
+    int deleteProjectMaterial(@Param("projectId") String projectId, @Param("materialId") String materialId, @Param("operator") String operator);
+
     @Select("""
             select id,
                    project_id as projectId,
@@ -349,6 +405,23 @@ public interface ProjectMapper {
             from kpm_project_materials where project_id=#{projectId} and del_flag=0 order by published_at desc
             """)
     List<ProjectFileEntity> projectMaterials(@Param("projectId") String projectId);
+
+    @Select("""
+            select id,
+                   project_id as projectId,
+                   announcement_type as announcementType,
+                   title,
+                   content,
+                   publisher,
+                   published_at as publishedAt,
+                   announcement_status as announcementStatus,
+                   retracted_at as retractedAt,
+                   retracted_by as retractedBy
+            from kpm_project_announcements
+            where project_id=#{projectId} and del_flag=0
+            order by published_at desc, id desc
+            """)
+    List<ProjectAnnouncementEntity> projectAnnouncements(@Param("projectId") String projectId);
 
     @Select("""
             select pc.id,
@@ -460,6 +533,17 @@ public interface ProjectMapper {
             @Param("announcementType") String announcementType,
             @Param("publisher") String publisher
     );
+
+    @Update("""
+            update kpm_project_announcements
+            set announcement_status='撤回',
+                retracted_at=current_timestamp,
+                retracted_by=#{operator},
+                updator=#{operator},
+                update_time=current_timestamp
+            where id=#{announcementId} and project_id=#{projectId} and del_flag=0 and announcement_status='已发布'
+            """)
+    int retractProjectAnnouncement(@Param("projectId") String projectId, @Param("announcementId") String announcementId, @Param("operator") String operator);
 
     @Insert("""
             insert into kpm_customer_portal_messages

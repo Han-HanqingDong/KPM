@@ -6,13 +6,18 @@ spring:
     name: kpm-analytics-service
   config:
     import: optional:nacos:${spring.application.name}.${spring.cloud.nacos.config.file-extension:yaml}
+  data:
+    redis:
+      host: ${KPM_VALKEY_HOST:127.0.0.1}
+      port: ${KPM_VALKEY_PORT:6379}
   datasource:
-    url: jdbc:postgresql://${KPM_DB_HOST:127.0.0.1}:${KPM_DB_PORT:5432}/${KPM_DB_NAME:kpm}?stringtype=unspecified
+    url: jdbc:postgresql://${KPM_DB_HOST:127.0.0.1}:${KPM_DB_PORT:5432}/${KPM_DB_NAME:kpm}?stringtype=unspecified&options=-c%20TimeZone%3D${KPM_DB_TIMEZONE:Asia/Shanghai}
     username: ${KPM_DB_USER:kpm}
     password: ${KPM_DB_PASSWORD:kpm_dev_password}
     hikari:
       maximum-pool-size: ${KPM_DB_POOL_MAX_SIZE:5}
       minimum-idle: ${KPM_DB_POOL_MIN_IDLE:1}
+      connection-init-sql: SET TIME ZONE '${KPM_DB_TIMEZONE:Asia/Shanghai}'
   cloud:
     nacos:
       server-addr: ${KPM_NACOS_ADDR:127.0.0.1:8848}
@@ -38,6 +43,18 @@ management:
 kpm:
   service:
     code: analytics
+  cache:
+    analytics:
+      dashboard-ttl-seconds: ${KPM_ANALYTICS_DASHBOARD_CACHE_TTL_SECONDS:30}
+      dashboard-jitter-seconds: ${KPM_ANALYTICS_DASHBOARD_CACHE_JITTER_SECONDS:10}
+      order-stats-ttl-seconds: ${KPM_ANALYTICS_ORDER_STATS_CACHE_TTL_SECONDS:90}
+      order-stats-jitter-seconds: ${KPM_ANALYTICS_ORDER_STATS_CACHE_JITTER_SECONDS:30}
+      resource-map-ttl-seconds: ${KPM_ANALYTICS_RESOURCE_MAP_CACHE_TTL_SECONDS:600}
+      resource-map-jitter-seconds: ${KPM_ANALYTICS_RESOURCE_MAP_CACHE_JITTER_SECONDS:120}
+      support-stats-ttl-seconds: ${KPM_ANALYTICS_SUPPORT_STATS_CACHE_TTL_SECONDS:60}
+      support-stats-jitter-seconds: ${KPM_ANALYTICS_SUPPORT_STATS_CACHE_JITTER_SECONDS:20}
+      activity-ttl-seconds: ${KPM_ANALYTICS_ACTIVITY_CACHE_TTL_SECONDS:180}
+      activity-jitter-seconds: ${KPM_ANALYTICS_ACTIVITY_CACHE_JITTER_SECONDS:45}
   geocoding:
     external-enabled: ${KPM_GEOCODING_EXTERNAL_ENABLED:false}
     provider: ${KPM_GEOCODING_PROVIDER:nominatim}

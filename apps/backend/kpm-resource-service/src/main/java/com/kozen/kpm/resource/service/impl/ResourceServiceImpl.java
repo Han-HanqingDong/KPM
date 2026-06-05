@@ -1,6 +1,8 @@
 package com.kozen.kpm.resource.service.impl;
 
+import com.kozen.kpm.common.cache.RedisJsonCache;
 import com.kozen.kpm.common.util.IdUtil;
+import com.kozen.kpm.resource.config.ResourceCacheProperties;
 import com.kozen.kpm.resource.converter.ResourceConverter;
 import com.kozen.kpm.resource.dto.DepartmentDto;
 import com.kozen.kpm.resource.dto.DepartmentRequest;
@@ -17,6 +19,7 @@ import com.kozen.kpm.resource.entity.RoleEntity;
 import com.kozen.kpm.resource.entity.UserResourceEntity;
 import com.kozen.kpm.resource.mapper.ResourceMapper;
 import com.kozen.kpm.resource.service.ResourceService;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,25 +35,38 @@ import java.util.List;
 @Service
 public class ResourceServiceImpl implements ResourceService {
     private static final String DEFAULT_INITIAL_PASSWORD = "123456";
+    private static final String BOOTSTRAP_CACHE_KEY = "kpm:cache:resource:bootstrap:v1";
 
     private final ResourceMapper resourceMapper;
     private final ResourceConverter resourceConverter;
+    private final ResourceCacheProperties cacheProperties;
+    private final RedisJsonCache redisCache;
 
-    public ResourceServiceImpl(ResourceMapper resourceMapper, ResourceConverter resourceConverter) {
+    public ResourceServiceImpl(
+            ResourceMapper resourceMapper,
+            ResourceConverter resourceConverter,
+            ResourceCacheProperties cacheProperties,
+            StringRedisTemplate redisTemplate
+    ) {
         this.resourceMapper = resourceMapper;
         this.resourceConverter = resourceConverter;
+        this.cacheProperties = cacheProperties;
+        this.redisCache = RedisJsonCache.withDefaultMapper(redisTemplate);
     }
 
     @Override
     public ResourceBootstrapDto bootstrap() {
-        return new ResourceBootstrapDto(
+        return redisCache.get(BOOTSTRAP_CACHE_KEY, ResourceBootstrapDto.class,
+                cacheProperties.bootstrapTtl(),
+                cacheProperties.bootstrapJitter(),
+                () -> new ResourceBootstrapDto(
                 users(),
                 departments(),
                 roles(),
                 resourceMapper.permissions().stream().map(resourceConverter::toPermissionDto).toList(),
                 resourceMapper.enumItems().stream().map(resourceConverter::toEnumItemDto).toList(),
                 resourceMapper.taskStatusTransitions().stream().map(resourceConverter::toTaskStatusTransitionDto).toList()
-        );
+        ));
     }
 
     @Override
@@ -66,6 +82,7 @@ public class ResourceServiceImpl implements ResourceService {
         String id = id("user", request.loginAccount());
         resourceMapper.insertUser(id, request);
         replaceUserRelations(id, request);
+        evictBootstrap();
         return getUser(id, DEFAULT_INITIAL_PASSWORD);
     }
 
@@ -74,18 +91,21 @@ public class ResourceServiceImpl implements ResourceService {
     public UserResourceDto updateUser(String id, UserRequest request) {
         resourceMapper.updateUser(id, request);
         replaceUserRelations(id, request);
+        evictBootstrap();
         return getUser(id, null);
     }
 
     @Override
     public UserResourceDto resetUserPassword(String id) {
         resourceMapper.resetUserPassword(id, "{noop}" + DEFAULT_INITIAL_PASSWORD);
+        evictBootstrap();
         return getUser(id, DEFAULT_INITIAL_PASSWORD);
     }
 
     @Override
     public boolean deleteUser(String id) {
         resourceMapper.deleteUser(id);
+        evictBootstrap();
         return true;
     }
 
@@ -100,18 +120,21 @@ public class ResourceServiceImpl implements ResourceService {
     public DepartmentDto createDepartment(DepartmentRequest request) {
         String id = id("dept", request.name());
         resourceMapper.insertDepartment(id, request);
+        evictBootstrap();
         return resourceConverter.toDepartmentDto(resourceMapper.department(id));
     }
 
     @Override
     public DepartmentDto updateDepartment(String id, DepartmentRequest request) {
         resourceMapper.updateDepartment(id, request);
+        evictBootstrap();
         return resourceConverter.toDepartmentDto(resourceMapper.department(id));
     }
 
     @Override
     public boolean deleteDepartment(String id) {
         resourceMapper.deleteDepartment(id);
+        evictBootstrap();
         return true;
     }
 
@@ -128,6 +151,7 @@ public class ResourceServiceImpl implements ResourceService {
         String id = id("role", request.name());
         resourceMapper.insertRole(id, request);
         replaceRolePermissions(id, request);
+        evictBootstrap();
         return getRole(id);
     }
 
@@ -136,12 +160,14 @@ public class ResourceServiceImpl implements ResourceService {
     public RoleDto updateRole(String id, RoleRequest request) {
         resourceMapper.updateRole(id, request);
         replaceRolePermissions(id, request);
+        evictBootstrap();
         return getRole(id);
     }
 
     @Override
     public boolean deleteRole(String id) {
         resourceMapper.deleteRole(id);
+        evictBootstrap();
         return true;
     }
 
@@ -149,18 +175,21 @@ public class ResourceServiceImpl implements ResourceService {
     public EnumItemDto createEnum(EnumItemRequest request) {
         String id = id("enum", request.enumType() + "-" + request.normalizedValue());
         resourceMapper.insertEnum(id, request);
+        evictBootstrap();
         return resourceConverter.toEnumItemDto(resourceMapper.enumItem(id));
     }
 
     @Override
     public EnumItemDto updateEnum(String id, EnumItemRequest request) {
         resourceMapper.updateEnum(id, request);
+        evictBootstrap();
         return resourceConverter.toEnumItemDto(resourceMapper.enumItem(id));
     }
 
     @Override
     public boolean deleteEnum(String id) {
         resourceMapper.deleteEnum(id);
+        evictBootstrap();
         return true;
     }
 
@@ -173,13 +202,19 @@ public class ResourceServiceImpl implements ResourceService {
         String transitionId = existingIds.isEmpty()
                 ? createTaskStatusTransitionRow(request)
                 : existingIds.getFirst();
+        evictBootstrap();
         return resourceConverter.toTaskStatusTransitionDto(resourceMapper.taskStatusTransition(transitionId));
     }
 
     @Override
     public boolean deleteTaskStatusTransition(String id) {
         resourceMapper.deleteTaskStatusTransition(id);
+        evictBootstrap();
         return true;
+    }
+
+    private void evictBootstrap() {
+        redisCache.evict(BOOTSTRAP_CACHE_KEY);
     }
 
     private String createTaskStatusTransitionRow(TaskStatusTransitionRequest request) {

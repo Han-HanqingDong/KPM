@@ -1,8 +1,10 @@
 package com.kozen.kpm.project.service.impl;
 
+import com.kozen.kpm.common.api.PageResult;
 import com.kozen.kpm.common.dto.FileMetadataRequest;
 import com.kozen.kpm.common.util.IdUtil;
 import com.kozen.kpm.common.util.JsonUtil;
+import com.kozen.kpm.common.util.PageParamUtil;
 import com.kozen.kpm.common.util.ValidationUtil;
 import com.kozen.kpm.project.converter.ProjectConverter;
 import com.kozen.kpm.project.dto.ArchiveProjectRequest;
@@ -62,6 +64,18 @@ public class ProjectServiceImpl implements ProjectService {
     @Override
     public List<ProjectDto> list(String keyword, Boolean archived) {
         return projectMapper.list(keyword, archived).stream().map(this::enrichProject).toList();
+    }
+
+    @Override
+    public PageResult<ProjectDto> page(String keyword, Boolean archived, Integer page, Integer pageSize) {
+        int current = PageParamUtil.page(page);
+        int size = PageParamUtil.pageSize(pageSize);
+        List<ProjectDto> items = projectMapper.pageRows(keyword, archived, size, PageParamUtil.offset(current, size))
+                .stream()
+                .map(this::enrichProjectSummary)
+                .toList();
+        long total = projectMapper.countRows(keyword, archived);
+        return PageResult.of(items, total, current, size);
     }
 
     @Override
@@ -254,6 +268,39 @@ public class ProjectServiceImpl implements ProjectService {
 
     @Override
     @Transactional
+    public ProjectDto retractProjectMaterialFromCustomer(String projectId, String materialId, String operator) {
+        ensureProjectExists(projectId);
+        int updated = projectMapper.retractProjectMaterialPublic(projectId, materialId, resolveOperator(operator));
+        if (updated == 0) {
+            throw new IllegalArgumentException("项目资料不存在、已删除或不可下架");
+        }
+        return detail(projectId);
+    }
+
+    @Override
+    @Transactional
+    public ProjectDto deleteProjectMaterial(String projectId, String materialId, String operator) {
+        ensureProjectExists(projectId);
+        int updated = projectMapper.deleteProjectMaterial(projectId, materialId, resolveOperator(operator));
+        if (updated == 0) {
+            throw new IllegalArgumentException("项目资料不存在或已删除");
+        }
+        return detail(projectId);
+    }
+
+    @Override
+    @Transactional
+    public ProjectDto retractAnnouncement(String projectId, String announcementId, String operator) {
+        ensureProjectExists(projectId);
+        int updated = projectMapper.retractProjectAnnouncement(projectId, announcementId, resolveOperator(operator));
+        if (updated == 0) {
+            throw new IllegalArgumentException("公告不存在、已撤回或已删除");
+        }
+        return detail(projectId);
+    }
+
+    @Override
+    @Transactional
     public ProjectDto archive(String id, ArchiveProjectRequest request) {
         ensureProjectExists(id);
         projectMapper.archiveProject(id, request.archived());
@@ -340,7 +387,16 @@ public class ProjectServiceImpl implements ProjectService {
         List<ProjectCustomerDto> customers = projectMapper.projectCustomers(id).stream()
                 .map(customer -> projectConverter.toCustomerDto(customer, projectMapper.requirements(id, customer.getCustomerId())))
                 .toList();
-        return projectConverter.toProjectDto(project, managerName, projectMapper.members(id), projectMapper.skus(id), stages, customers, projectMapper.projectMaterials(id));
+        return projectConverter.toProjectDto(project, managerName, projectMapper.members(id), projectMapper.skus(id), stages, customers, projectMapper.projectMaterials(id), projectMapper.projectAnnouncements(id));
+    }
+
+    private ProjectDto enrichProjectSummary(ProjectEntity project) {
+        if (project == null) {
+            throw new IllegalArgumentException("项目不存在");
+        }
+        String id = project.getId();
+        String managerName = projectMapper.managerName(stringValue(project.getManagerUserId()) == null ? project.getManagerAccount() : project.getManagerUserId());
+        return projectConverter.toProjectSummaryDto(project, managerName, projectMapper.members(id), projectMapper.skus(id));
     }
 
     private ProcessTemplateDto enrichTemplate(ProcessTemplateEntity template) {
@@ -443,7 +499,7 @@ public class ProjectServiceImpl implements ProjectService {
             return;
         }
         projectMapper.insertNotificationEvent(
-                IdUtil.nanoId("evt"),
+                IdUtil.numericId(),
                 "PROJECT_CREATED",
                 projectId,
                 "你被加入新项目",

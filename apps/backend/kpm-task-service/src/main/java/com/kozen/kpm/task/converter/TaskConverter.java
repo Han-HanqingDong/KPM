@@ -54,6 +54,44 @@ public class TaskConverter {
         );
     }
 
+    public TaskDto toTaskSummaryDto(
+            TaskEntity task,
+            List<String> assignees,
+            List<String> assigneeIds,
+            List<String> participants,
+            List<String> participantIds
+    ) {
+        return new TaskDto(
+                task.getId(),
+                task.getTaskNo(),
+                task.getTitle(),
+                task.getDescription(),
+                task.getProjectId(),
+                task.getStageId(),
+                task.getCustomerId(),
+                task.getProjectName(),
+                task.getStageName(),
+                task.getCustomerName(),
+                task.getCategory(),
+                task.getStatus(),
+                task.getPriority(),
+                task.getCreatorUserId(),
+                task.getCreator(),
+                task.getExpectedCompletionAt(),
+                task.getDueDate(),
+                task.getSource(),
+                task.getBlocked(),
+                task.getCreatedAt(),
+                task.getUpdatedAt(),
+                List.copyOf(assignees),
+                List.copyOf(assigneeIds),
+                List.copyOf(participants),
+                List.copyOf(participantIds),
+                List.of(),
+                List.of()
+        );
+    }
+
     public TaskAttachmentDto toAttachmentDto(TaskAttachmentEntity attachment) {
         return new TaskAttachmentDto(
                 attachment.getId(),

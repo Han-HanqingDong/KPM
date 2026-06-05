@@ -53,7 +53,19 @@ public class ResourceConverter {
     }
 
     public EnumItemDto toEnumItemDto(EnumItemEntity item) {
-        return new EnumItemDto(item.getId(), item.getEnumType(), item.getName(), item.getValue(), item.getSemantic(), item.getActive(), item.getSortOrder());
+        return new EnumItemDto(
+                item.getId(),
+                item.getEnumType(),
+                item.getName(),
+                item.getValue(),
+                item.getLabelZh(),
+                item.getLabelEn(),
+                item.getShortLabelZh(),
+                item.getShortLabelEn(),
+                item.getSemantic(),
+                item.getActive(),
+                item.getSortOrder()
+        );
     }
 
     public TaskStatusTransitionDto toTaskStatusTransitionDto(TaskStatusTransitionEntity transition) {

@@ -14,7 +14,6 @@ public class NotificationConverter {
                 value(entity.getContent()),
                 blankToDefault(entity.getMessageType(), "system"),
                 read,
-                read ? "READ" : "UNREAD",
                 entity.getCreatedAt() == null ? "" : entity.getCreatedAt().toString(),
                 entity.getReadAt() == null ? null : entity.getReadAt().toString()
         );

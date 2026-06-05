@@ -1,6 +1,7 @@
 package com.kozen.kpm.notification.controller;
 
 import com.kozen.kpm.common.api.ApiResponse;
+import com.kozen.kpm.common.api.PageResult;
 import com.kozen.kpm.notification.dto.InternalMessageDto;
 import com.kozen.kpm.notification.dto.NotificationSettingsDto;
 import com.kozen.kpm.notification.dto.UnreadCountDto;
@@ -43,6 +44,17 @@ public class NotificationApiController {
             @RequestParam(defaultValue = "false") boolean unreadOnly
     ) {
         return ApiResponse.ok(notificationService.messages(account, unreadOnly));
+    }
+
+    @GetMapping("/messages/page")
+    @Operation(summary = "分页查询内部消息", description = "分页和未读过滤在后端执行，消息盒子无需拉取全量消息。")
+    public ApiResponse<PageResult<InternalMessageDto>> messagesPage(
+            @RequestHeader("X-KPM-Account") String account,
+            @RequestParam(defaultValue = "false") boolean unreadOnly,
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "20") Integer pageSize
+    ) {
+        return ApiResponse.ok(notificationService.messagesPage(account, unreadOnly, page, pageSize));
     }
 
     @GetMapping("/unread-count")

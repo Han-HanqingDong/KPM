@@ -1,4 +1,4 @@
-import { BellOutlined, DashboardOutlined, DatabaseOutlined, FileTextOutlined, LineChartOutlined, MenuFoldOutlined, MenuUnfoldOutlined, ProjectOutlined, ShopOutlined, TeamOutlined, UnorderedListOutlined } from '@ant-design/icons';
+import { BellOutlined, BookOutlined, DashboardOutlined, DatabaseOutlined, FileTextOutlined, LineChartOutlined, MenuFoldOutlined, MenuUnfoldOutlined, ProjectOutlined, ShopOutlined, TeamOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import { Avatar, Badge, Button, Dropdown, Layout, Menu, Space, Typography, message } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,19 +13,20 @@ import { dateTimeText } from '../utils/format';
 const { Sider, Content } = Layout;
 
 const navItems = [
-  { key: '/dashboard', label: '工作台', icon: <DashboardOutlined />, permission: 'menu:dashboard' },
-  { key: '/projects', label: '项目管理', icon: <ProjectOutlined />, permission: 'menu:projects' },
-  { key: '/customers', label: '客户管理', icon: <TeamOutlined />, permission: 'menu:customer-master' },
-  { key: '/tasks', label: '任务管理', icon: <UnorderedListOutlined />, permission: 'menu:tasks' },
-  { key: '/orders', label: '订单管理', icon: <ShopOutlined />, permission: 'menu:orders' },
-  { key: '/analytics', label: '统计看板', icon: <LineChartOutlined />, permission: 'menu:analytics', children: [
-    { key: '/analytics/orders', label: '订单情况', permission: 'menu:analytics' },
-    { key: '/analytics/support', label: '技术支持情况', permission: 'menu:analytics' },
-    { key: '/analytics/resources', label: '资源分布', permission: 'menu:analytics' },
-    { key: '/analytics/activity', label: '客户×项目活跃度', permission: 'menu:analytics' },
+  { key: '/dashboard', labelKey: 'nav.dashboard', icon: <DashboardOutlined />, permission: 'menu:dashboard' },
+  { key: '/projects', labelKey: 'nav.projects', icon: <ProjectOutlined />, permission: 'menu:projects' },
+  { key: '/customers', labelKey: 'nav.customers', icon: <TeamOutlined />, permission: 'menu:customer-master' },
+  { key: '/tasks', labelKey: 'nav.tasks', icon: <UnorderedListOutlined />, permission: 'menu:tasks' },
+  { key: '/knowledge', labelKey: 'nav.knowledge', icon: <BookOutlined />, permission: 'menu:knowledge' },
+  { key: '/orders', labelKey: 'nav.orders', icon: <ShopOutlined />, permission: 'menu:orders' },
+  { key: '/analytics', labelKey: 'nav.analytics', icon: <LineChartOutlined />, permission: 'menu:analytics', children: [
+    { key: '/analytics/orders', labelKey: 'nav.analyticsOrders', permission: 'menu:analytics' },
+    { key: '/analytics/support', labelKey: 'nav.analyticsSupport', permission: 'menu:analytics' },
+    { key: '/analytics/resources', labelKey: 'nav.analyticsResources', permission: 'menu:analytics' },
+    { key: '/analytics/activity', labelKey: 'nav.analyticsActivity', permission: 'menu:analytics' },
   ] },
-  { key: '/templates', label: '流程模板', icon: <FileTextOutlined />, permission: 'menu:templates' },
-  { key: '/resources', label: '资源管理', icon: <DatabaseOutlined />, permission: 'menu:resources' },
+  { key: '/templates', labelKey: 'nav.templates', icon: <FileTextOutlined />, permission: 'menu:templates' },
+  { key: '/resources', labelKey: 'nav.resources', icon: <DatabaseOutlined />, permission: 'menu:resources' },
 ];
 
 export function MainLayout() {
@@ -47,7 +48,7 @@ export function MainLayout() {
     return found?.key || '/dashboard';
   }, [location.pathname, visibleItems]);
   const openKeys = useMemo(() => location.pathname.startsWith('/analytics') ? ['/analytics'] : [], [location.pathname]);
-  const unread = messages.filter((item) => !item.readFlag && item.readFlag !== true).length;
+  const unread = messages.filter((item) => !item.read).length;
 
   useEffect(() => {
     localStorage.setItem('kpm.react.sidebarCollapsed', String(collapsed));
@@ -70,7 +71,7 @@ export function MainLayout() {
 
   async function markAllRead() {
     await kpmApi.markAllRead();
-    setMessages((rows) => rows.map((row) => ({ ...row, readFlag: true })));
+    setMessages((rows) => rows.map((row) => ({ ...row, read: true })));
     message.success('消息已全部标记为已读');
   }
 
@@ -88,7 +89,7 @@ export function MainLayout() {
           mode="inline"
           selectedKeys={[selectedKey]}
           defaultOpenKeys={openKeys}
-          items={visibleItems.map(({ key, label, icon, children }) => ({ key, label, icon, children: children?.map((child) => ({ key: child.key, label: child.label })) }))}
+          items={visibleItems.map(({ key, labelKey, icon, children }) => ({ key, label: t(labelKey), icon, children: children?.map((child) => ({ key: child.key, label: t(child.labelKey) })) }))}
           onClick={({ key }) => navigate(key)}
         />
         <div className="kpm-user-foot">
@@ -135,7 +136,7 @@ export function MainLayout() {
                   <Button size="small" onClick={markAllRead}>{t('nav.markAllRead')}</Button>
                 </div>
                 {messages.length ? messages.map((item) => (
-                  <article key={item.id} className={item.readFlag ? 'read' : ''}>
+                  <article key={item.id} className={item.read ? 'read' : ''}>
                     <strong>{item.title || '系统消息'}</strong>
                     <p>{item.content || '-'}</p>
                     <small>{dateTimeText(item.createdAt)}</small>

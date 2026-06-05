@@ -11,12 +11,13 @@ spring:
       host: ${KPM_VALKEY_HOST:127.0.0.1}
       port: ${KPM_VALKEY_PORT:6379}
   datasource:
-    url: jdbc:postgresql://${KPM_DB_HOST:127.0.0.1}:${KPM_DB_PORT:5432}/${KPM_DB_NAME:kpm}?stringtype=unspecified
+    url: jdbc:postgresql://${KPM_DB_HOST:127.0.0.1}:${KPM_DB_PORT:5432}/${KPM_DB_NAME:kpm}?stringtype=unspecified&options=-c%20TimeZone%3D${KPM_DB_TIMEZONE:Asia/Shanghai}
     username: ${KPM_DB_USER:kpm}
     password: ${KPM_DB_PASSWORD:kpm_dev_password}
     hikari:
       maximum-pool-size: ${KPM_DB_POOL_MAX_SIZE:5}
       minimum-idle: ${KPM_DB_POOL_MIN_IDLE:1}
+      connection-init-sql: SET TIME ZONE '${KPM_DB_TIMEZONE:Asia/Shanghai}'
   cloud:
     nacos:
       server-addr: ${KPM_NACOS_ADDR:127.0.0.1:8848}

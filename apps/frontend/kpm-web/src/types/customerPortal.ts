@@ -60,7 +60,7 @@ export type CustomerPortalMessage = {
   projectName?: string;
   taskId?: Id;
   announcementId?: Id;
-  readFlag?: boolean;
+  read?: boolean;
   createdAt?: string;
   readAt?: string;
 };
@@ -73,14 +73,63 @@ export type CustomerPortalTask = {
   projectId?: Id;
   projectName?: string;
   category?: string;
+  categoryLabelZh?: string;
+  categoryLabelEn?: string;
+  categoryShortLabelZh?: string;
+  categoryShortLabelEn?: string;
   status?: string;
   priority?: string;
+  creator?: string;
   expectedCompletionAt?: string;
   blocked?: boolean;
   createdAt?: string;
   updatedAt?: string;
   commentCount?: number;
+  attachments?: AnyRecord[];
   comments?: CustomerPortalTaskComment[];
+};
+
+export type CustomerPortalProjectTaskStats = {
+  projectId?: Id;
+  projectName?: string;
+  totalTasks: number;
+  completedTasks: number;
+  openTasks: number;
+  avgResponseHours: number;
+  avgCompletionHours: number;
+};
+
+export type CustomerPortalTaskCreatorStats = {
+  contactEmail: string;
+  contactName?: string;
+  submittedTasks: number;
+};
+
+export type CustomerPortalTaskCategoryStats = {
+  category: string;
+  labelZh?: string;
+  labelEn?: string;
+  shortLabelZh?: string;
+  shortLabelEn?: string;
+  totalTasks: number;
+};
+
+export type CustomerPortalTaskStats = {
+  totalTasks: number;
+  completedTasks: number;
+  openTasks: number;
+  completionRate: number;
+  avgResponseHours: number;
+  avgCompletionHours: number;
+  projects: CustomerPortalProjectTaskStats[];
+  creators: CustomerPortalTaskCreatorStats[];
+  categories: CustomerPortalTaskCategoryStats[];
+};
+
+export type CustomerPortalContact = {
+  contactId: Id;
+  contactName: string;
+  email: string;
 };
 
 export type CustomerPortalTaskComment = {
@@ -103,8 +152,7 @@ export type CustomerPortalTaskCommentPage = {
 export type CustomerPortalData = {
   user: CustomerPortalUser;
   projects: CustomerPortalProject[];
-  materials: CustomerPortalMaterial[];
-  tasks: CustomerPortalTask[];
+  taskStatuses: string[];
   announcements: CustomerPortalAnnouncement[];
   messages: CustomerPortalMessage[];
   unreadCount: number;

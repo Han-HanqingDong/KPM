@@ -1,5 +1,6 @@
 package com.kozen.kpm.project.service;
 
+import com.kozen.kpm.common.api.PageResult;
 import com.kozen.kpm.common.dto.FileMetadataRequest;
 import com.kozen.kpm.project.dto.ArchiveProjectRequest;
 import com.kozen.kpm.project.dto.LinkCustomerRequest;
@@ -29,6 +30,9 @@ import java.util.List;
 public interface ProjectService {
     /** Query project list by keyword and archive status. */
     List<ProjectDto> list(String keyword, Boolean archived);
+
+    /** Query a paged project list with filters pushed down to SQL. */
+    PageResult<ProjectDto> page(String keyword, Boolean archived, Integer page, Integer pageSize);
 
     /** Load one project with members, stages, customers, requirements and materials. */
     ProjectDto detail(String id);
@@ -84,8 +88,17 @@ public interface ProjectService {
     /** Mark one project material as visible to customer portal users after confirmation. */
     ProjectDto publishProjectMaterialToCustomer(String projectId, String materialId);
 
+    /** Remove one project material from customer portal visibility. */
+    ProjectDto retractProjectMaterialFromCustomer(String projectId, String materialId, String operator);
+
+    /** Logically delete one project material from the project material area. */
+    ProjectDto deleteProjectMaterial(String projectId, String materialId, String operator);
+
     /** Publish a project announcement to linked customer portal contacts. */
     ProjectDto publishAnnouncement(String projectId, ProjectAnnouncementRequest request, String publisher);
+
+    /** Retract one project announcement from customer portal display while preserving history. */
+    ProjectDto retractAnnouncement(String projectId, String announcementId, String operator);
 
     /** Archive or unarchive a project. */
     ProjectDto archive(String id, ArchiveProjectRequest request);

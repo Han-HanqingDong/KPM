@@ -1,6 +1,7 @@
 package com.kozen.kpm.project.controller;
 
 import com.kozen.kpm.common.api.ApiResponse;
+import com.kozen.kpm.common.api.PageResult;
 import com.kozen.kpm.common.dto.FileMetadataRequest;
 import com.kozen.kpm.project.dto.ArchiveProjectRequest;
 import com.kozen.kpm.project.dto.LinkCustomerRequest;
@@ -45,6 +46,15 @@ public class ProjectApiController {
     public ApiResponse<List<ProjectDto>> list(@RequestParam(required = false) String keyword,
                                                         @RequestParam(required = false) Boolean archived) {
         return ApiResponse.ok(projectService.list(keyword, archived));
+    }
+
+    @GetMapping("/page")
+    @Operation(summary = "分页查询项目列表", description = "分页、关键字与归档状态过滤均在后端 SQL 执行，避免前端拉取全量项目。")
+    public ApiResponse<PageResult<ProjectDto>> page(@RequestParam(required = false) String keyword,
+                                                    @RequestParam(required = false) Boolean archived,
+                                                    @RequestParam(defaultValue = "1") Integer page,
+                                                    @RequestParam(defaultValue = "20") Integer pageSize) {
+        return ApiResponse.ok(projectService.page(keyword, archived, page, pageSize));
     }
 
     @GetMapping("/{id}")
@@ -160,6 +170,22 @@ public class ProjectApiController {
         return ApiResponse.ok(projectService.publishProjectMaterialToCustomer(id, materialId));
     }
 
+    @PostMapping("/{id}/materials/{materialId}/retract")
+    @Operation(summary = "下架客户可见项目资料", description = "将已公开的项目资料从客户门户下架，但保留项目资料记录。")
+    public ApiResponse<ProjectDto> retractProjectMaterialFromCustomer(@PathVariable String id,
+                                                                      @PathVariable String materialId,
+                                                                      @RequestHeader(value = "X-KPM-Account", required = false) String operator) {
+        return ApiResponse.ok(projectService.retractProjectMaterialFromCustomer(id, materialId, operator));
+    }
+
+    @DeleteMapping("/{id}/materials/{materialId}")
+    @Operation(summary = "删除项目资料", description = "逻辑删除项目资料，若资料已公开则同步取消客户门户可见。")
+    public ApiResponse<ProjectDto> deleteProjectMaterial(@PathVariable String id,
+                                                         @PathVariable String materialId,
+                                                         @RequestHeader(value = "X-KPM-Account", required = false) String operator) {
+        return ApiResponse.ok(projectService.deleteProjectMaterial(id, materialId, operator));
+    }
+
     @PostMapping("/stage-materials/{materialId}/publish")
     @Operation(summary = "发布阶段资料到项目资料区", description = "经过二次确认后，将阶段资料发布到项目资料区。")
     public ApiResponse<ProjectDto> publishStageMaterial(@PathVariable String materialId) {
@@ -174,6 +200,16 @@ public class ProjectApiController {
                                                        @RequestHeader(value = "X-KPM-User", required = false) String publisher,
                                                        @RequestHeader(value = "X-KPM-Account", required = false) String publisherAccount) {
         return ApiResponse.ok(projectService.publishAnnouncement(id, request, resolvePublisher(encodedPublisher, publisher, publisherAccount)));
+    }
+
+    @PostMapping("/{id}/announcements/{announcementId}/retract")
+    @Operation(summary = "撤回项目公告", description = "撤回后客户门户不再展示该公告，公告历史仍保留发布人与撤回信息。")
+    public ApiResponse<ProjectDto> retractAnnouncement(@PathVariable String id,
+                                                       @PathVariable String announcementId,
+                                                       @RequestHeader(value = "X-KPM-User-Name-Base64", required = false) String encodedPublisher,
+                                                       @RequestHeader(value = "X-KPM-User", required = false) String publisher,
+                                                       @RequestHeader(value = "X-KPM-Account", required = false) String publisherAccount) {
+        return ApiResponse.ok(projectService.retractAnnouncement(id, announcementId, resolvePublisher(encodedPublisher, publisher, publisherAccount)));
     }
 
     @PostMapping("/{id}/archive")

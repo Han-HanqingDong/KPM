@@ -2,6 +2,7 @@ package com.kozen.kpm.project.converter;
 
 import com.kozen.kpm.common.util.JsonUtil;
 import com.kozen.kpm.project.dto.ProcessTemplateDto;
+import com.kozen.kpm.project.dto.ProjectAnnouncementDto;
 import com.kozen.kpm.project.dto.ProjectCustomerDto;
 import com.kozen.kpm.project.dto.ProjectDto;
 import com.kozen.kpm.project.dto.ProjectFileDto;
@@ -13,6 +14,7 @@ import com.kozen.kpm.project.dto.RequirementOverviewDto;
 import com.kozen.kpm.project.dto.StageAssigneeDto;
 import com.kozen.kpm.project.dto.StageRecordDto;
 import com.kozen.kpm.project.entity.ProcessTemplateEntity;
+import com.kozen.kpm.project.entity.ProjectAnnouncementEntity;
 import com.kozen.kpm.project.entity.ProjectCustomerEntity;
 import com.kozen.kpm.project.entity.ProjectEntity;
 import com.kozen.kpm.project.entity.ProjectFileEntity;
@@ -37,7 +39,8 @@ public class ProjectConverter {
             List<ProjectSkuEntity> skus,
             List<ProjectStageDto> stages,
             List<ProjectCustomerDto> customers,
-            List<ProjectFileEntity> projectMaterials
+            List<ProjectFileEntity> projectMaterials,
+            List<ProjectAnnouncementEntity> announcements
     ) {
         return new ProjectDto(
                 project.getId(),
@@ -56,7 +59,36 @@ public class ProjectConverter {
                 stages,
                 customers,
                 projectMaterials.stream().map(this::toFileDto).toList(),
-                projectMaterials.stream().map(this::toFileDto).toList()
+                projectMaterials.stream().map(this::toFileDto).toList(),
+                announcements.stream().map(this::toAnnouncementDto).toList()
+        );
+    }
+
+    public ProjectDto toProjectSummaryDto(
+            ProjectEntity project,
+            String managerName,
+            List<ProjectMemberEntity> members,
+            List<ProjectSkuEntity> skus
+    ) {
+        return new ProjectDto(
+                project.getId(),
+                project.getExternalName(),
+                project.getInternalName(),
+                project.getModelName(),
+                project.getManagerUserId(),
+                project.getManagerAccount(),
+                managerName,
+                project.getArchived(),
+                project.getDescription(),
+                project.getCreatedAt(),
+                project.getUpdatedAt(),
+                members.stream().map(this::toMemberDto).toList(),
+                skus.stream().map(this::toSkuDto).toList(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of()
         );
     }
 
@@ -104,6 +136,21 @@ public class ProjectConverter {
         return new ProjectFileDto(
                 file.getId(), file.getStageId(), file.getProjectId(), file.getSourceStage(), file.getStageName(), file.getFileName(), file.getFileType(), file.getFileSize(), file.getDescription(),
                 file.getUploader(), file.getBucket(), file.getObjectKey(), file.getStorageUrl(), file.getStorageCategory(), file.getShareTarget(), file.getPublishedToProject(), file.getPublicVisible(), file.getUploadedAt(), file.getPublishedAt(), file.getPublicAt()
+        );
+    }
+
+    public ProjectAnnouncementDto toAnnouncementDto(ProjectAnnouncementEntity announcement) {
+        return new ProjectAnnouncementDto(
+                announcement.getId(),
+                announcement.getProjectId(),
+                announcement.getAnnouncementType(),
+                announcement.getTitle(),
+                announcement.getContent(),
+                announcement.getPublisher(),
+                announcement.getPublishedAt(),
+                announcement.getAnnouncementStatus(),
+                announcement.getRetractedAt(),
+                announcement.getRetractedBy()
         );
     }
 

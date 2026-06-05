@@ -14,6 +14,8 @@ DB_NAME="${KPM_DB_NAME:-kpm}"
 DB_USER="${KPM_DB_USER:-kpm}"
 DB_PASSWORD="${KPM_DB_PASSWORD:-kpm_dev_password}"
 AUTH_SECRET="${KPM_AUTH_TOKEN_SECRET:-kpm-local-dev-secret-change-me}"
+DB_TIMEZONE="${KPM_DB_TIMEZONE:-Asia/Shanghai}"
+DB_JDBC_URL="jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?stringtype=unspecified&options=-c%20TimeZone%3D${DB_TIMEZONE}"
 
 publish() {
   local data_id="$1"
@@ -144,12 +146,13 @@ server:
   port: ${port}
 spring:
   datasource:
-    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?stringtype=unspecified
+    url: ${DB_JDBC_URL}
     username: ${DB_USER}
     password: ${DB_PASSWORD}
     hikari:
       maximum-pool-size: ${KPM_DB_POOL_MAX_SIZE:-5}
       minimum-idle: ${KPM_DB_POOL_MIN_IDLE:-1}
+      connection-init-sql: SET TIME ZONE '${DB_TIMEZONE}'
 kpm:
   service:
     code: ${code}
@@ -159,24 +162,55 @@ kpm:
 YAML
 }
 
-publish kpm-iam-service.yaml "$(base_config 8101 iam)"
-publish kpm-resource-service.yaml "$(base_config 8102 resource)"
-publish kpm-project-service.yaml "$(base_config 8103 project)"
-publish kpm-customer-service.yaml "$(cat <<YAML
-server:
-  port: 8104
-spring:
+redis_config_block() {
+  cat <<YAML
   data:
     redis:
       host: ${KPM_VALKEY_HOST:-valkey}
       port: ${KPM_VALKEY_PORT:-6379}
+YAML
+}
+
+publish kpm-iam-service.yaml "$(base_config 8101 iam)"
+publish kpm-resource-service.yaml "$(cat <<YAML
+server:
+  port: 8102
+spring:
+$(redis_config_block)
   datasource:
-    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?stringtype=unspecified
+    url: ${DB_JDBC_URL}
     username: ${DB_USER}
     password: ${DB_PASSWORD}
     hikari:
       maximum-pool-size: ${KPM_DB_POOL_MAX_SIZE:-5}
       minimum-idle: ${KPM_DB_POOL_MIN_IDLE:-1}
+      connection-init-sql: SET TIME ZONE '${DB_TIMEZONE}'
+kpm:
+  service:
+    code: resource
+  auth:
+    token-secret: ${AUTH_SECRET}
+    token-ttl-seconds: ${KPM_AUTH_TOKEN_TTL_SECONDS:-7200}
+  cache:
+    resource:
+      bootstrap-ttl-seconds: ${KPM_RESOURCE_BOOTSTRAP_CACHE_TTL_SECONDS:-60}
+      bootstrap-jitter-seconds: ${KPM_RESOURCE_BOOTSTRAP_CACHE_JITTER_SECONDS:-20}
+YAML
+)"
+publish kpm-project-service.yaml "$(base_config 8103 project)"
+publish kpm-customer-service.yaml "$(cat <<YAML
+server:
+  port: 8104
+spring:
+$(redis_config_block)
+  datasource:
+    url: ${DB_JDBC_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${KPM_DB_POOL_MAX_SIZE:-5}
+      minimum-idle: ${KPM_DB_POOL_MIN_IDLE:-1}
+      connection-init-sql: SET TIME ZONE '${DB_TIMEZONE}'
   mail:
     host: ${KPM_MAIL_HOST:-}
     port: ${KPM_MAIL_PORT:-587}
@@ -239,18 +273,32 @@ publish kpm-analytics-service.yaml "$(cat <<YAML
 server:
   port: 8108
 spring:
+$(redis_config_block)
   datasource:
-    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?stringtype=unspecified
+    url: ${DB_JDBC_URL}
     username: ${DB_USER}
     password: ${DB_PASSWORD}
     hikari:
       maximum-pool-size: ${KPM_DB_POOL_MAX_SIZE:-5}
       minimum-idle: ${KPM_DB_POOL_MIN_IDLE:-1}
+      connection-init-sql: SET TIME ZONE '${DB_TIMEZONE}'
 kpm:
   service:
     code: analytics
   auth:
     token-secret: ${AUTH_SECRET}
+  cache:
+    analytics:
+      dashboard-ttl-seconds: ${KPM_ANALYTICS_DASHBOARD_CACHE_TTL_SECONDS:-30}
+      dashboard-jitter-seconds: ${KPM_ANALYTICS_DASHBOARD_CACHE_JITTER_SECONDS:-10}
+      order-stats-ttl-seconds: ${KPM_ANALYTICS_ORDER_STATS_CACHE_TTL_SECONDS:-90}
+      order-stats-jitter-seconds: ${KPM_ANALYTICS_ORDER_STATS_CACHE_JITTER_SECONDS:-30}
+      resource-map-ttl-seconds: ${KPM_ANALYTICS_RESOURCE_MAP_CACHE_TTL_SECONDS:-600}
+      resource-map-jitter-seconds: ${KPM_ANALYTICS_RESOURCE_MAP_CACHE_JITTER_SECONDS:-120}
+      support-stats-ttl-seconds: ${KPM_ANALYTICS_SUPPORT_STATS_CACHE_TTL_SECONDS:-60}
+      support-stats-jitter-seconds: ${KPM_ANALYTICS_SUPPORT_STATS_CACHE_JITTER_SECONDS:-20}
+      activity-ttl-seconds: ${KPM_ANALYTICS_ACTIVITY_CACHE_TTL_SECONDS:-180}
+      activity-jitter-seconds: ${KPM_ANALYTICS_ACTIVITY_CACHE_JITTER_SECONDS:-45}
   geocoding:
     external-enabled: ${KPM_GEOCODING_EXTERNAL_ENABLED:-false}
     provider: ${KPM_GEOCODING_PROVIDER:-nominatim}
@@ -304,7 +352,7 @@ spring:
             - id: customers
               uri: lb://kpm-customer-service
               predicates:
-                - Path=/api/customers/**,/api/customer-portal/**
+                - Path=/api/customers/**,/api/customer-portal/**,/api/knowledge/**
             - id: tasks
               uri: lb://kpm-task-service
               predicates:
@@ -345,12 +393,13 @@ server:
   port: 8110
 spring:
   datasource:
-    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?stringtype=unspecified
+    url: ${DB_JDBC_URL}
     username: ${DB_USER}
     password: ${DB_PASSWORD}
     hikari:
       maximum-pool-size: ${KPM_DB_POOL_MAX_SIZE:-5}
       minimum-idle: ${KPM_DB_POOL_MIN_IDLE:-1}
+      connection-init-sql: SET TIME ZONE '${DB_TIMEZONE}'
   mail:
     host: ${KPM_MAIL_HOST:-}
     port: ${KPM_MAIL_PORT:-587}

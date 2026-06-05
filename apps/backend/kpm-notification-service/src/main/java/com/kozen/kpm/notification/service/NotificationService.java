@@ -1,5 +1,6 @@
 package com.kozen.kpm.notification.service;
 
+import com.kozen.kpm.common.api.PageResult;
 import com.kozen.kpm.notification.dto.InternalMessageDto;
 import com.kozen.kpm.notification.dto.NotificationSettingsDto;
 
@@ -16,6 +17,9 @@ public interface NotificationService {
      * @return internal messages with explicit read status for frontend rendering
      */
     List<InternalMessageDto> messages(String account, boolean unreadOnly);
+
+    /** Query internal messages by page for the current account. */
+    PageResult<InternalMessageDto> messagesPage(String account, boolean unreadOnly, Integer page, Integer pageSize);
 
     int unreadCount(String account);
 

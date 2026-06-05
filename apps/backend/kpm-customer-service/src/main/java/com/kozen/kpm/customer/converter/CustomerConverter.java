@@ -37,6 +37,26 @@ public class CustomerConverter {
         );
     }
 
+    public CustomerDto toSummaryDto(CustomerEntity customer, List<String> salesOwners, List<String> supportOwners) {
+        return new CustomerDto(
+                customer.getId(),
+                customer.getName(),
+                customer.getShortName(),
+                customer.getRegion(),
+                customer.getAddress(),
+                customer.getLevel(),
+                customer.getStatus(),
+                customer.getCreatedAt(),
+                customer.getUpdatedAt(),
+                salesOwners,
+                supportOwners,
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of()
+        );
+    }
+
     public CustomerContactDTO toContactDto(CustomerContactEntity entity) {
         return new CustomerContactDTO(entity.id(), entity.customerId(), entity.name(), entity.title(), entity.phone(), entity.email(), entity.remark());
     }

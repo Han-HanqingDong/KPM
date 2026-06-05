@@ -1,21 +1,29 @@
 package com.kozen.kpm.customer.portal.service.impl;
 
+import com.kozen.kpm.common.api.PageResult;
 import com.kozen.kpm.common.auth.AuthTokenUtil;
 import com.kozen.kpm.common.util.IdUtil;
 import com.kozen.kpm.common.util.JsonUtil;
+import com.kozen.kpm.common.util.PageParamUtil;
+import com.kozen.kpm.customer.knowledge.dto.KnowledgeArticleDto;
+import com.kozen.kpm.customer.knowledge.service.KnowledgeService;
 import com.kozen.kpm.customer.portal.config.CustomerPortalProperties;
 import com.kozen.kpm.customer.portal.converter.CustomerPortalConverter;
 import com.kozen.kpm.customer.portal.dto.CustomerPortalCodeRequest;
 import com.kozen.kpm.customer.portal.dto.CustomerPortalCodeResponse;
+import com.kozen.kpm.customer.portal.dto.CustomerPortalContactDto;
 import com.kozen.kpm.customer.portal.dto.CustomerPortalDataDto;
 import com.kozen.kpm.customer.portal.dto.CustomerPortalLoginRequest;
 import com.kozen.kpm.customer.portal.dto.CustomerPortalLoginResponse;
+import com.kozen.kpm.customer.portal.dto.CustomerPortalMaterialDto;
 import com.kozen.kpm.customer.portal.dto.CustomerPortalMeDto;
 import com.kozen.kpm.customer.portal.dto.CustomerPortalMessageDto;
+import com.kozen.kpm.customer.portal.dto.CustomerPortalTaskAttachmentRequest;
 import com.kozen.kpm.customer.portal.dto.CustomerPortalTaskDto;
 import com.kozen.kpm.customer.portal.dto.CustomerPortalTaskCommentPageDto;
 import com.kozen.kpm.customer.portal.dto.CustomerPortalTaskCommentRequest;
 import com.kozen.kpm.customer.portal.dto.CustomerPortalTaskRequest;
+import com.kozen.kpm.customer.portal.dto.CustomerPortalTaskStatsDto;
 import com.kozen.kpm.customer.portal.entity.CustomerPortalContactEntity;
 import com.kozen.kpm.customer.portal.entity.CustomerPortalSupportOwnerEntity;
 import com.kozen.kpm.customer.portal.entity.CustomerPortalTaskCommentEntity;
@@ -50,6 +58,7 @@ public class CustomerPortalServiceImpl implements com.kozen.kpm.customer.portal.
     private final CustomerPortalConverter converter;
     private final CustomerPortalProperties properties;
     private final StringRedisTemplate redisTemplate;
+    private final KnowledgeService knowledgeService;
     private final JavaMailSender mailSender;
     private final String tokenSecret;
 
@@ -58,6 +67,7 @@ public class CustomerPortalServiceImpl implements com.kozen.kpm.customer.portal.
             CustomerPortalConverter converter,
             CustomerPortalProperties properties,
             StringRedisTemplate redisTemplate,
+            KnowledgeService knowledgeService,
             ObjectProvider<JavaMailSender> mailSenderProvider,
             @Value("${kpm.auth.token-secret:" + AuthTokenUtil.DEFAULT_SECRET + "}") String tokenSecret
     ) {
@@ -65,6 +75,7 @@ public class CustomerPortalServiceImpl implements com.kozen.kpm.customer.portal.
         this.converter = converter;
         this.properties = properties;
         this.redisTemplate = redisTemplate;
+        this.knowledgeService = knowledgeService;
         this.mailSender = mailSenderProvider.getIfAvailable();
         this.tokenSecret = tokenSecret;
     }
@@ -125,12 +136,41 @@ public class CustomerPortalServiceImpl implements com.kozen.kpm.customer.portal.
         return new CustomerPortalDataDto(
                 converter.toMeDto(contact),
                 mapper.projects(customerId).stream().map(converter::toProjectDto).toList(),
-                mapper.publicMaterials(customerId).stream().map(converter::toMaterialDto).toList(),
-                mapper.tasks(customerId).stream().map(converter::toTaskDto).toList(),
+                mapper.taskStatuses(customerId),
                 mapper.announcements(customerId).stream().map(converter::toAnnouncementDto).toList(),
                 mapper.messages(contact.getEmail(), false).stream().map(converter::toMessageDto).toList(),
                 mapper.unreadCount(contact.getEmail())
         );
+    }
+
+    @Override
+    public PageResult<CustomerPortalMaterialDto> materialsPage(String authorizationHeader, String projectId, String keyword, Integer page, Integer pageSize) {
+        CustomerPortalContactEntity contact = currentContact(authorizationHeader);
+        String projectValue = optionalNumericId(projectId, "项目ID");
+        if (!projectValue.isBlank() && mapper.linkedProjectCount(contact.getCustomerId(), projectValue) == 0) {
+            throw new IllegalArgumentException("该项目未与当前客户关联，不能查看资料");
+        }
+        String like = likeOrBlank(keyword);
+        int current = PageParamUtil.page(page);
+        int size = Math.min(PageParamUtil.pageSize(pageSize), 50);
+        List<CustomerPortalMaterialDto> items = mapper.publicMaterialsPage(
+                        contact.getCustomerId(),
+                        projectValue,
+                        like,
+                        size,
+                        PageParamUtil.offset(current, size)
+                )
+                .stream()
+                .map(converter::toMaterialDto)
+                .toList();
+        long total = mapper.publicMaterialsCount(contact.getCustomerId(), projectValue, like);
+        return PageResult.of(items, total, current, size);
+    }
+
+    @Override
+    public List<CustomerPortalContactDto> contacts(String authorizationHeader) {
+        CustomerPortalContactEntity contact = currentContact(authorizationHeader);
+        return mapper.contacts(contact.getCustomerId()).stream().map(converter::toContactDto).toList();
     }
 
     @Override
@@ -168,6 +208,95 @@ public class CustomerPortalServiceImpl implements com.kozen.kpm.customer.portal.
         return converter.toTaskDto(mapper.task(contact.getCustomerId(), id));
     }
 
+    @Override
+    public PageResult<CustomerPortalTaskDto> tasksPage(String authorizationHeader, String projectId, String status, String creatorEmail, Integer page, Integer pageSize) {
+        CustomerPortalContactEntity contact = currentContact(authorizationHeader);
+        String projectValue = optionalNumericId(projectId, "项目ID");
+        String statusValue = cleanOptional(status);
+        String creatorValue = normalizeEmail(creatorEmail);
+        if (!creatorValue.isBlank()) {
+            boolean belongsToCustomer = mapper.contacts(contact.getCustomerId()).stream()
+                    .anyMatch(item -> normalizeEmail(item.getEmail()).equals(creatorValue));
+            if (!belongsToCustomer) {
+                throw new IllegalArgumentException("创建人不是当前客户联系人，不能作为筛选条件");
+            }
+        }
+        int current = PageParamUtil.page(page);
+        int size = Math.min(PageParamUtil.pageSize(pageSize), 50);
+        List<CustomerPortalTaskDto> items = mapper.tasksPage(
+                        contact.getCustomerId(),
+                        projectValue,
+                        statusValue == null ? "" : statusValue,
+                        creatorValue,
+                        size,
+                        PageParamUtil.offset(current, size)
+                )
+                .stream()
+                .map(converter::toTaskDto)
+                .toList();
+        long total = mapper.tasksPageCount(contact.getCustomerId(), projectValue, statusValue == null ? "" : statusValue, creatorValue);
+        return PageResult.of(items, total, current, size);
+    }
+
+    @Override
+    public CustomerPortalTaskDto task(String authorizationHeader, String taskId) {
+        CustomerPortalContactEntity contact = currentContact(authorizationHeader);
+        CustomerPortalTaskEntity task = mapper.task(contact.getCustomerId(), taskId);
+        if (task == null) {
+            throw new IllegalArgumentException("该任务不属于当前客户，不能查看详情");
+        }
+        return converter.toTaskDto(task, mapper.taskAttachments(contact.getCustomerId(), taskId), List.of());
+    }
+
+    @Override
+    @Transactional
+    public CustomerPortalTaskDto addTaskAttachments(String authorizationHeader, String taskId, CustomerPortalTaskAttachmentRequest request) {
+        CustomerPortalContactEntity contact = currentContact(authorizationHeader);
+        if (mapper.customerTaskCount(contact.getCustomerId(), taskId) == 0) {
+            throw new IllegalArgumentException("该任务不属于当前客户，不能添加附件");
+        }
+        String uploader = firstNonBlank(contact.getContactName(), contact.getEmail(), "customer-portal");
+        for (Map<String, Object> attachment : request.safeAttachments()) {
+            String fileName = firstNonBlank(metadataValue(attachment, "fileName"), metadataValue(attachment, "name"));
+            if (fileName.isBlank()) {
+                throw new IllegalArgumentException("附件文件名不能为空");
+            }
+            mapper.insertTaskAttachment(
+                    IdUtil.numericId(),
+                    taskId,
+                    fileName,
+                    firstNonBlank(metadataValue(attachment, "fileType"), metadataValue(attachment, "type")),
+                    firstNonBlank(metadataValue(attachment, "fileSize"), metadataValue(attachment, "size")),
+                    firstNonBlank(metadataValue(attachment, "uploader"), uploader),
+                    metadataValue(attachment, "bucket"),
+                    firstNonBlank(metadataValue(attachment, "objectKey"), metadataValue(attachment, "object_key")),
+                    firstNonBlank(metadataValue(attachment, "storageUrl"), metadataValue(attachment, "storage_url"), metadataValue(attachment, "url")),
+                    firstNonBlank(metadataValue(attachment, "storageCategory"), metadataValue(attachment, "category"))
+            );
+        }
+        CustomerPortalTaskEntity task = mapper.task(contact.getCustomerId(), taskId);
+        return converter.toTaskDto(task, mapper.taskAttachments(contact.getCustomerId(), taskId), List.of());
+    }
+
+    @Override
+    public List<String> taskStatuses(String authorizationHeader) {
+        return mapper.taskStatuses(currentContact(authorizationHeader).getCustomerId());
+    }
+
+    @Override
+    public CustomerPortalTaskStatsDto taskStats(String authorizationHeader, String projectId) {
+        CustomerPortalContactEntity contact = currentContact(authorizationHeader);
+        String projectValue = optionalNumericId(projectId, "项目ID");
+        if (!projectValue.isBlank() && mapper.linkedProjectCount(contact.getCustomerId(), projectValue) == 0) {
+            throw new IllegalArgumentException("该项目未与当前客户关联，不能查看统计");
+        }
+        return converter.toTaskStatsDto(
+                mapper.taskStats(contact.getCustomerId(), projectValue),
+                mapper.taskStatsByProject(contact.getCustomerId(), projectValue),
+                mapper.taskCreatorStats(contact.getCustomerId(), projectValue),
+                mapper.taskCategoryStats(contact.getCustomerId(), projectValue)
+        );
+    }
 
     @Override
     public CustomerPortalTaskCommentPageDto taskComments(String authorizationHeader, String taskId, int page, int pageSize) {
@@ -205,7 +334,7 @@ public class CustomerPortalServiceImpl implements com.kozen.kpm.customer.portal.
         mapper.insertExternalTaskComment(IdUtil.nanoId("tc"), taskId, author, request.content(), request.safeAttachments());
         CustomerPortalTaskEntity task = mapper.task(contact.getCustomerId(), taskId);
         publishCustomerCommentNotification(taskId, task == null ? taskId : firstNonBlank(task.getTaskNo(), task.getTitle(), taskId), request.content(), contact);
-        return converter.toTaskDto(mapper.task(contact.getCustomerId(), taskId));
+        return converter.toTaskDto(mapper.task(contact.getCustomerId(), taskId), mapper.taskAttachments(contact.getCustomerId(), taskId), List.of());
     }
 
     @Override
@@ -229,6 +358,18 @@ public class CustomerPortalServiceImpl implements com.kozen.kpm.customer.portal.
     @Transactional
     public int markAllMessagesRead(String authorizationHeader) {
         return mapper.markAllMessagesRead(currentContact(authorizationHeader).getEmail());
+    }
+
+    @Override
+    public PageResult<KnowledgeArticleDto> knowledgePage(String authorizationHeader, String keyword, Integer page, Integer pageSize) {
+        CustomerPortalContactEntity contact = currentContact(authorizationHeader);
+        return knowledgeService.portalPage(contact.getCustomerId(), keyword, page, pageSize);
+    }
+
+    @Override
+    public KnowledgeArticleDto knowledgeDetail(String authorizationHeader, String id) {
+        CustomerPortalContactEntity contact = currentContact(authorizationHeader);
+        return knowledgeService.portalDetail(contact.getCustomerId(), id);
     }
 
     private CustomerPortalContactEntity currentContact(String authorizationHeader) {
@@ -269,7 +410,7 @@ public class CustomerPortalServiceImpl implements com.kozen.kpm.customer.portal.
     private void publishNotification(String taskId, String taskNo, String title, CustomerPortalContactEntity contact, List<CustomerPortalSupportOwnerEntity> supportOwners) {
         List<String> recipients = supportOwners.stream().map(CustomerPortalSupportOwnerEntity::getUserId).distinct().toList();
         mapper.insertNotificationEvent(
-                IdUtil.nanoId("evt"),
+                IdUtil.numericId(),
                 "CUSTOMER_TASK_CREATED",
                 taskId,
                 "客户创建了新任务",
@@ -284,7 +425,7 @@ public class CustomerPortalServiceImpl implements com.kozen.kpm.customer.portal.
         List<String> recipients = supportOwners.stream().map(CustomerPortalSupportOwnerEntity::getUserId).distinct().toList();
         if (recipients.isEmpty()) return;
         mapper.insertNotificationEvent(
-                IdUtil.nanoId("evt"),
+                IdUtil.numericId(),
                 "CUSTOMER_TASK_COMMENT_CREATED",
                 taskId,
                 "客户新增了任务留言",
@@ -308,6 +449,32 @@ public class CustomerPortalServiceImpl implements com.kozen.kpm.customer.portal.
 
     private String normalizeEmail(String email) {
         return String.valueOf(email == null ? "" : email).trim().toLowerCase();
+    }
+
+    private String optionalNumericId(String value, String label) {
+        String text = cleanOptional(value);
+        if (text == null) return "";
+        if (!text.matches("\\d+")) {
+            throw new IllegalArgumentException(label + "格式不正确");
+        }
+        return text;
+    }
+
+    private String likeOrBlank(String value) {
+        String text = cleanOptional(value);
+        if (text == null) return "";
+        return "%" + text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+    }
+
+    private String cleanOptional(String value) {
+        String text = value == null ? "" : value.trim();
+        return text.isEmpty() ? null : text;
+    }
+
+    private String metadataValue(Map<String, Object> metadata, String key) {
+        if (metadata == null || key == null) return "";
+        Object value = metadata.get(key);
+        return value == null ? "" : String.valueOf(value).trim();
     }
 
     private String hash(String email, String code) {

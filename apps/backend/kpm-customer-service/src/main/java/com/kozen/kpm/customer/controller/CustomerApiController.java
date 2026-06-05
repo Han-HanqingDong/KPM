@@ -1,6 +1,7 @@
 package com.kozen.kpm.customer.controller;
 
 import com.kozen.kpm.common.api.ApiResponse;
+import com.kozen.kpm.common.api.PageResult;
 import com.kozen.kpm.common.dto.FileMetadataRequest;
 import com.kozen.kpm.customer.dto.CustomerContactRequest;
 import com.kozen.kpm.customer.dto.CustomerDto;
@@ -33,6 +34,14 @@ public class CustomerApiController {
     @Operation(summary = "查询客户列表", description = "支持按客户名称、简称或地区关键字搜索。")
     public ApiResponse<List<CustomerDto>> list(@RequestParam(required = false) String keyword) {
         return ApiResponse.ok(customerService.list(keyword));
+    }
+
+    @GetMapping("/page")
+    @Operation(summary = "分页查询客户列表", description = "分页和关键字搜索下沉到后端 SQL，避免客户数量增加后前端全量分页。")
+    public ApiResponse<PageResult<CustomerDto>> page(@RequestParam(required = false) String keyword,
+                                                     @RequestParam(defaultValue = "1") Integer page,
+                                                     @RequestParam(defaultValue = "20") Integer pageSize) {
+        return ApiResponse.ok(customerService.page(keyword, page, pageSize));
     }
 
     @GetMapping("/{id}")

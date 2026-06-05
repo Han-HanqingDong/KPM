@@ -1,7 +1,9 @@
 package com.kozen.kpm.customer.service.impl;
 
+import com.kozen.kpm.common.api.PageResult;
 import com.kozen.kpm.common.dto.FileMetadataRequest;
 import com.kozen.kpm.common.util.IdUtil;
+import com.kozen.kpm.common.util.PageParamUtil;
 import com.kozen.kpm.common.util.SqlParamUtil;
 import com.kozen.kpm.common.util.ValidationUtil;
 import com.kozen.kpm.customer.converter.CustomerConverter;
@@ -53,6 +55,18 @@ public class CustomerServiceImpl implements CustomerService {
     @Override
     public List<CustomerDto> list(String keyword) {
         return customerMapper.list(SqlParamUtil.likeOrBlank(keyword)).stream().map(this::enrichCustomer).toList();
+    }
+
+    @Override
+    public PageResult<CustomerDto> page(String keyword, Integer page, Integer pageSize) {
+        int current = PageParamUtil.page(page);
+        int size = PageParamUtil.pageSize(pageSize);
+        String like = SqlParamUtil.likeOrBlank(keyword);
+        List<CustomerDto> items = customerMapper.pageRows(like, size, PageParamUtil.offset(current, size))
+                .stream()
+                .map(this::enrichCustomerSummary)
+                .toList();
+        return PageResult.of(items, customerMapper.countRows(like), current, size);
     }
 
     @Override
@@ -182,6 +196,18 @@ public class CustomerServiceImpl implements CustomerService {
                 customerMapper.materials(id),
                 customerMapper.followups(id),
                 customerMapper.projects(id)
+        );
+    }
+
+    private CustomerDto enrichCustomerSummary(CustomerEntity customer) {
+        if (customer == null) {
+            throw new IllegalArgumentException("客户不存在");
+        }
+        String id = customer.getId();
+        return customerConverter.toSummaryDto(
+                customer,
+                customerMapper.ownerNames(id, "sales"),
+                customerMapper.ownerNames(id, "support")
         );
     }
 

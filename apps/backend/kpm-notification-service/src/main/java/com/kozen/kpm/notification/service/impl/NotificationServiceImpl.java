@@ -1,7 +1,9 @@
 package com.kozen.kpm.notification.service.impl;
 
+import com.kozen.kpm.common.api.PageResult;
 import com.kozen.kpm.common.util.IdUtil;
 import com.kozen.kpm.common.util.JsonUtil;
+import com.kozen.kpm.common.util.PageParamUtil;
 import com.kozen.kpm.notification.config.NotificationProperties;
 import com.kozen.kpm.notification.converter.NotificationConverter;
 import com.kozen.kpm.notification.dto.InternalMessageDto;
@@ -21,6 +23,10 @@ import java.util.List;
 
 @Service
 public class NotificationServiceImpl implements NotificationService {
+    private static final int EVENT_BATCH_SIZE = 50;
+    private static final int EVENT_MAX_RETRIES = 3;
+    private static final int EVENT_STALE_LOCK_SECONDS = 300;
+
     private final NotificationMapper notificationMapper;
     private final NotificationProperties properties;
     private final NotificationConverter notificationConverter;
@@ -36,19 +42,25 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     @Scheduled(fixedDelayString = "${kpm.notification.processor-interval-ms:15000}")
     public void processPendingEvents() {
-        for (NotificationEventEntity event : notificationMapper.pendingEvents(50)) {
-            List<String> recipients = recipientIds(event.getRecipientUserIds());
-            for (String recipientId : recipients) {
-                notificationMapper.insertMessage(
-                        IdUtil.nanoId("msg"),
-                        recipientId,
-                        event.getTitle(),
-                        event.getContent(),
-                        blankToDefault(event.getEventType(), "system")
-                );
-                sendMailIfEnabled(recipientId, event.getTitle(), event.getContent());
+        String workerId = "notification-service-" + Integer.toHexString(System.identityHashCode(this));
+        for (NotificationEventEntity event : notificationMapper.claimPendingEvents(EVENT_BATCH_SIZE, workerId, EVENT_STALE_LOCK_SECONDS, EVENT_MAX_RETRIES)) {
+            try {
+                List<String> recipients = recipientIds(event.getRecipientUserIds());
+                for (String recipientId : recipients) {
+                    notificationMapper.insertMessage(
+                            IdUtil.numericId(),
+                            recipientId,
+                            event.getTitle(),
+                            event.getContent(),
+                            blankToDefault(event.getEventType(), "system"),
+                            event.getId()
+                    );
+                    sendMailIfEnabled(recipientId, event.getTitle(), event.getContent());
+                }
+                notificationMapper.markEventProcessed(event.getId());
+            } catch (Exception e) {
+                notificationMapper.markEventFailed(event.getId(), safeError(e), EVENT_MAX_RETRIES);
             }
-            notificationMapper.markEventProcessed(event.getId());
         }
     }
 
@@ -62,6 +74,18 @@ public class NotificationServiceImpl implements NotificationService {
         return notificationMapper.messages(currentUserId(account), unreadOnly).stream()
                 .map(notificationConverter::toInternalMessageDto)
                 .toList();
+    }
+
+    @Override
+    public PageResult<InternalMessageDto> messagesPage(String account, boolean unreadOnly, Integer page, Integer pageSize) {
+        String userId = currentUserId(account);
+        int current = PageParamUtil.page(page);
+        int size = PageParamUtil.pageSize(pageSize);
+        List<InternalMessageDto> items = notificationMapper.messagesPage(userId, unreadOnly, size, PageParamUtil.offset(current, size))
+                .stream()
+                .map(notificationConverter::toInternalMessageDto)
+                .toList();
+        return PageResult.of(items, notificationMapper.messageCount(userId, unreadOnly), current, size);
     }
 
     @Override
@@ -120,5 +144,13 @@ public class NotificationServiceImpl implements NotificationService {
 
     private String blankToDefault(String value, String defaultValue) {
         return value == null || value.isBlank() ? defaultValue : value;
+    }
+
+    private String safeError(Exception e) {
+        String message = e.getMessage();
+        if (message == null || message.isBlank()) {
+            message = e.getClass().getSimpleName();
+        }
+        return message.length() > 1000 ? message.substring(0, 1000) : message;
     }
 }

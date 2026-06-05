@@ -7,8 +7,7 @@ import java.util.List;
 public record CustomerPortalDataDto(
         CustomerPortalMeDto user,
         List<CustomerPortalProjectDto> projects,
-        List<CustomerPortalMaterialDto> materials,
-        List<CustomerPortalTaskDto> tasks,
+        List<String> taskStatuses,
         List<CustomerPortalAnnouncementDto> announcements,
         List<CustomerPortalMessageDto> messages,
         int unreadCount

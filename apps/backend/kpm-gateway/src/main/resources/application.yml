@@ -55,7 +55,7 @@ spring:
             - id: customers
               uri: lb://kpm-customer-service
               predicates:
-                - Path=/api/customers/**,/api/customer-portal/**
+                - Path=/api/customers/**,/api/customer-portal/**,/api/knowledge/**
             - id: tasks
               uri: lb://kpm-task-service
               predicates:

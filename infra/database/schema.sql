@@ -72,6 +72,9 @@ CREATE TABLE kpm_notification_events (
   recipient_user_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
   payload JSONB NOT NULL DEFAULT '{}'::jsonb,
   status TEXT NOT NULL DEFAULT 'PENDING',
+  retry_count INT NOT NULL DEFAULT 0,
+  locked_at TIMESTAMP,
+  last_error TEXT,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   processed_at TIMESTAMP
 );
@@ -82,6 +85,7 @@ CREATE TABLE kpm_internal_messages (
   title TEXT NOT NULL,
   content TEXT NOT NULL,
   message_type TEXT NOT NULL DEFAULT 'system',
+  source_event_id TEXT,
   read_flag BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   read_at TIMESTAMP
@@ -134,6 +138,10 @@ CREATE TABLE kpm_enum_items (
   enum_type TEXT NOT NULL,
   name TEXT NOT NULL,
   value TEXT NOT NULL,
+  label_zh TEXT,
+  label_en TEXT,
+  short_label_zh TEXT,
+  short_label_en TEXT,
   semantic TEXT,
   active BOOLEAN NOT NULL DEFAULT TRUE,
   sort_order INT NOT NULL DEFAULT 0,
@@ -281,7 +289,10 @@ CREATE TABLE kpm_project_announcements (
   content TEXT NOT NULL,
   announcement_type TEXT NOT NULL DEFAULT '普通公告',
   publisher TEXT,
-  published_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  published_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  announcement_status TEXT NOT NULL DEFAULT '已发布',
+  retracted_at TIMESTAMP,
+  retracted_by TEXT
 );
 
 CREATE TABLE kpm_customers (
@@ -542,6 +553,7 @@ CREATE INDEX IF NOT EXISTS idx_kpm_stage_records_stage ON kpm_stage_records (sta
 CREATE INDEX IF NOT EXISTS idx_kpm_project_materials_project ON kpm_project_materials (project_id, del_flag, published_at DESC);
 CREATE INDEX IF NOT EXISTS idx_kpm_project_materials_public ON kpm_project_materials (project_id, public_visible, del_flag, public_at DESC, published_at DESC);
 CREATE INDEX IF NOT EXISTS idx_kpm_project_announcements_project_time ON kpm_project_announcements (project_id, del_flag, published_at DESC);
+CREATE INDEX IF NOT EXISTS idx_kpm_project_announcements_active_portal ON kpm_project_announcements (project_id, announcement_status, del_flag, published_at DESC);
 CREATE INDEX IF NOT EXISTS idx_kpm_process_templates_list ON kpm_process_templates (del_flag, updated_at DESC, name);
 CREATE INDEX IF NOT EXISTS idx_kpm_customers_list ON kpm_customers (del_flag, name);
 CREATE INDEX IF NOT EXISTS idx_kpm_customers_short_name_upper ON kpm_customers (upper(short_name)) WHERE del_flag=0;
@@ -568,6 +580,7 @@ CREATE INDEX IF NOT EXISTS idx_kpm_task_participants_task ON kpm_task_participan
 CREATE INDEX IF NOT EXISTS idx_kpm_task_participants_user ON kpm_task_participants (user_id, del_flag, task_id);
 CREATE INDEX IF NOT EXISTS idx_kpm_task_attachments_task ON kpm_task_attachments (task_id, del_flag, uploaded_at DESC);
 CREATE INDEX IF NOT EXISTS idx_kpm_task_comments_task ON kpm_task_comments (task_id, del_flag, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_kpm_task_comments_page ON kpm_task_comments (task_id, del_flag, created_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_kpm_task_comments_external ON kpm_task_comments (task_id, comment_type, del_flag, created_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_kpm_orders_list_date ON kpm_orders (del_flag, order_date DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_kpm_orders_customer_date ON kpm_orders (customer_id, del_flag, order_date DESC);
@@ -578,8 +591,84 @@ CREATE INDEX IF NOT EXISTS idx_kpm_order_histories_order ON kpm_order_histories 
 CREATE INDEX IF NOT EXISTS idx_kpm_notification_events_pending ON kpm_notification_events (status, del_flag, created_at);
 CREATE INDEX IF NOT EXISTS idx_kpm_internal_messages_recipient_time ON kpm_internal_messages (recipient_user_id, del_flag, read_flag, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_kpm_internal_messages_cleanup ON kpm_internal_messages (read_flag, del_flag, read_at);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_kpm_internal_messages_event_recipient
+  ON kpm_internal_messages (source_event_id, recipient_user_id, message_type)
+  WHERE source_event_id IS NOT NULL AND del_flag=0;
+CREATE INDEX IF NOT EXISTS idx_kpm_notification_events_claim
+  ON kpm_notification_events (status, del_flag, created_at, locked_at)
+  WHERE status IN ('PENDING', 'PROCESSING');
+CREATE INDEX IF NOT EXISTS idx_kpm_internal_messages_page
+  ON kpm_internal_messages (recipient_user_id, del_flag, read_flag, created_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_kpm_customer_portal_messages_customer ON kpm_customer_portal_messages (customer_id, del_flag, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_kpm_customer_portal_messages_task ON kpm_customer_portal_messages (task_id, del_flag, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_kpm_customer_portal_messages_announcement ON kpm_customer_portal_messages (announcement_id, del_flag, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_kpm_customer_email_outbox_status_time ON kpm_customer_email_outbox (status, del_flag, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_kpm_customer_portal_messages_contact_time ON kpm_customer_portal_messages (lower(contact_email), del_flag, created_at DESC);
+
+-- Knowledge base: internal articles and customer portal visibility scopes.
+CREATE TABLE IF NOT EXISTS kpm_knowledge_articles (
+  id BIGINT PRIMARY KEY,
+  title TEXT NOT NULL,
+  symptom TEXT NOT NULL,
+  root_cause TEXT NOT NULL,
+  solution TEXT,
+  workaround TEXT,
+  attachments JSONB NOT NULL DEFAULT '[]'::jsonb,
+  status TEXT NOT NULL DEFAULT '待审核',
+  author_user_id BIGINT REFERENCES kpm_users(id),
+  author_name TEXT,
+  published_at TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  creator TEXT,
+  updator TEXT,
+  create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  del_flag SMALLINT NOT NULL DEFAULT 0,
+  CONSTRAINT chk_kpm_knowledge_solution_or_workaround CHECK (
+    coalesce(nullif(trim(solution), ''), nullif(trim(workaround), '')) IS NOT NULL
+  )
+);
+
+CREATE TABLE IF NOT EXISTS kpm_knowledge_article_projects (
+  id BIGINT PRIMARY KEY,
+  article_id BIGINT NOT NULL REFERENCES kpm_knowledge_articles(id),
+  project_id BIGINT REFERENCES kpm_projects(id),
+  project_scope TEXT NOT NULL DEFAULT 'PROJECT',
+  creator TEXT,
+  updator TEXT,
+  create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  del_flag SMALLINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS kpm_knowledge_article_customers (
+  id BIGINT PRIMARY KEY,
+  article_id BIGINT NOT NULL REFERENCES kpm_knowledge_articles(id),
+  customer_id BIGINT REFERENCES kpm_customers(id),
+  customer_scope TEXT NOT NULL DEFAULT 'CUSTOMER',
+  creator TEXT,
+  updator TEXT,
+  create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  del_flag SMALLINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS kpm_knowledge_article_tasks (
+  id BIGINT PRIMARY KEY,
+  article_id BIGINT NOT NULL REFERENCES kpm_knowledge_articles(id),
+  task_id BIGINT NOT NULL REFERENCES kpm_tasks(id),
+  creator TEXT,
+  updator TEXT,
+  create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  del_flag SMALLINT NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_kpm_knowledge_articles_page ON kpm_knowledge_articles (del_flag, status, updated_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_kpm_knowledge_articles_search ON kpm_knowledge_articles USING gin (to_tsvector('simple', coalesce(title, '') || ' ' || coalesce(symptom, '') || ' ' || coalesce(root_cause, '')));
+CREATE INDEX IF NOT EXISTS idx_kpm_knowledge_article_projects_article ON kpm_knowledge_article_projects (article_id, del_flag);
+CREATE INDEX IF NOT EXISTS idx_kpm_knowledge_article_projects_project ON kpm_knowledge_article_projects (project_id, del_flag, article_id);
+CREATE INDEX IF NOT EXISTS idx_kpm_knowledge_article_customers_article ON kpm_knowledge_article_customers (article_id, del_flag);
+CREATE INDEX IF NOT EXISTS idx_kpm_knowledge_article_customers_customer ON kpm_knowledge_article_customers (customer_id, customer_scope, del_flag, article_id);
+CREATE INDEX IF NOT EXISTS idx_kpm_knowledge_article_tasks_task ON kpm_knowledge_article_tasks (task_id, del_flag, article_id);

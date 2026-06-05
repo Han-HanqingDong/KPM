@@ -10,6 +10,7 @@ import { LoginPage } from './pages/LoginPage';
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage').then((module) => ({ default: module.AnalyticsPage })));
 const CustomersPage = lazy(() => import('./pages/CustomersPage').then((module) => ({ default: module.CustomersPage })));
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then((module) => ({ default: module.DashboardPage })));
+const KnowledgePage = lazy(() => import('./pages/KnowledgePage').then((module) => ({ default: module.KnowledgePage })));
 const OrdersPage = lazy(() => import('./pages/OrdersPage').then((module) => ({ default: module.OrdersPage })));
 const ProjectDetailPage = lazy(() => import('./pages/ProjectDetailPage').then((module) => ({ default: module.ProjectDetailPage })));
 const ProjectsPage = lazy(() => import('./pages/ProjectsPage').then((module) => ({ default: module.ProjectsPage })));
@@ -18,6 +19,7 @@ const TasksPage = lazy(() => import('./pages/TasksPage').then((module) => ({ def
 const TemplatesPage = lazy(() => import('./pages/TemplatesPage').then((module) => ({ default: module.TemplatesPage })));
 const CustomerPortalLoginPage = lazy(() => import('./pages/customerPortal/CustomerPortalLoginPage').then((module) => ({ default: module.CustomerPortalLoginPage })));
 const CustomerPortalPage = lazy(() => import('./pages/customerPortal/CustomerPortalPage').then((module) => ({ default: module.CustomerPortalPage })));
+const CustomerPortalKnowledgePage = lazy(() => import('./pages/customerPortal/CustomerPortalKnowledgePage').then((module) => ({ default: module.CustomerPortalKnowledgePage })));
 
 function RouteFallback() {
   return <div className="kpm-route-fallback"><Skeleton active paragraph={{ rows: 8 }} /></div>;
@@ -45,6 +47,7 @@ export default function App() {
             <Route path="/login" element={<AuthRedirect />} />
             <Route path="/customer-login" element={<CustomerPortalLoginPage />} />
             <Route path="/customer-portal" element={<CustomerPortalPage />} />
+            <Route path="/customer-portal/kb" element={<CustomerPortalKnowledgePage />} />
             <Route element={<ProtectedLayout />}>
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<DashboardPage />} />
@@ -52,6 +55,7 @@ export default function App() {
               <Route path="/projects/:id" element={<ProjectDetailPage />} />
               <Route path="/customers" element={<CustomersPage />} />
               <Route path="/tasks" element={<TasksPage />} />
+              <Route path="/knowledge" element={<KnowledgePage />} />
               <Route path="/orders" element={<OrdersPage />} />
               <Route path="/analytics/*" element={<AnalyticsPage />} />
               <Route path="/templates" element={<TemplatesPage />} />

@@ -11,8 +11,13 @@ public class CustomerPortalTaskEntity {
     private String projectId;
     private String projectName;
     private String category;
+    private String categoryLabelZh;
+    private String categoryLabelEn;
+    private String categoryShortLabelZh;
+    private String categoryShortLabelEn;
     private String status;
     private String priority;
+    private String creator;
     private LocalDate expectedCompletionAt;
     private Boolean blocked;
     private LocalDateTime createdAt;
@@ -33,10 +38,20 @@ public class CustomerPortalTaskEntity {
     public void setProjectName(String projectName) { this.projectName = projectName; }
     public String getCategory() { return category; }
     public void setCategory(String category) { this.category = category; }
+    public String getCategoryLabelZh() { return categoryLabelZh; }
+    public void setCategoryLabelZh(String categoryLabelZh) { this.categoryLabelZh = categoryLabelZh; }
+    public String getCategoryLabelEn() { return categoryLabelEn; }
+    public void setCategoryLabelEn(String categoryLabelEn) { this.categoryLabelEn = categoryLabelEn; }
+    public String getCategoryShortLabelZh() { return categoryShortLabelZh; }
+    public void setCategoryShortLabelZh(String categoryShortLabelZh) { this.categoryShortLabelZh = categoryShortLabelZh; }
+    public String getCategoryShortLabelEn() { return categoryShortLabelEn; }
+    public void setCategoryShortLabelEn(String categoryShortLabelEn) { this.categoryShortLabelEn = categoryShortLabelEn; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     public String getPriority() { return priority; }
     public void setPriority(String priority) { this.priority = priority; }
+    public String getCreator() { return creator; }
+    public void setCreator(String creator) { this.creator = creator; }
     public LocalDate getExpectedCompletionAt() { return expectedCompletionAt; }
     public void setExpectedCompletionAt(LocalDate expectedCompletionAt) { this.expectedCompletionAt = expectedCompletionAt; }
     public Boolean getBlocked() { return blocked; }

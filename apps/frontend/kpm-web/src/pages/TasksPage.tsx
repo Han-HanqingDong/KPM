@@ -1,12 +1,16 @@
 import { PlusOutlined, UploadOutlined } from '@ant-design/icons';
 import { Button, Card, Descriptions, Drawer, Form, Input, Modal, Radio, Space, Switch, Table, Tag, Typography, Upload, message } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
+import type { UIEvent } from 'react';
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { ActionButtons } from '../components/common/ActionButtons';
 import { CustomerSelect } from '../components/common/CustomerSelect';
 import { DataState } from '../components/common/DataState';
 import { EnumSelect } from '../components/common/EnumSelect';
 import { ProjectSelect } from '../components/common/ProjectSelect';
+import { TaskCategoryTag, TaskPriorityTag, TaskProjectTag } from '../components/common/TaskVisualTags';
 import { UserSelect } from '../components/common/UserSelect';
 import { PageScaffold } from '../components/PageScaffold';
 import { StatusTag } from '../components/StatusTag';
@@ -16,12 +20,19 @@ import { confirmSubmit } from '../hooks/useConfirmingForm';
 import { kpmApi } from '../services/kpmApi';
 import type { AnyRecord, Task } from '../types';
 import { MAX_ATTACHMENT_SIZE_MB, attachmentLimitMessage, downloadBusinessFile, isWithinAttachmentLimit, normalizeUploadFiles, uploadBusinessFiles } from '../utils/fileUpload';
-import { compactId, compareDateDesc, dateText, dateTimeText, enumValues, includesKeyword, isClosedTaskStatus, isCompletedTaskStatus } from '../utils/format';
-import { resolveTaskUser, taskAssignedToUser, taskRelatedToUser } from '../utils/taskScope';
+import { compactId, dateText, dateTimeText, enumDisplayLabel, enumShortLabel, enumValues } from '../utils/format';
+import { resolveTaskUser } from '../utils/taskScope';
 import { validationRules } from '../validation';
 
 function uploadFileList(event: AnyRecord) {
   return Array.isArray(event) ? event : event?.fileList;
+}
+
+
+const TASK_COMMENT_PAGE_SIZE = 10;
+
+function taskCommentsKey(taskId?: string) {
+  return ['kpm', 'task-comments', taskId || ''] as const;
 }
 
 function beforeUpload(file: File) {
@@ -34,7 +45,9 @@ function beforeUpload(file: File) {
 
 export function TasksPage() {
   const { data, isLoading, error } = useKpmData();
+  const { i18n } = useTranslation();
   const refresh = useRefreshKpmData();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const [form] = Form.useForm();
@@ -45,15 +58,20 @@ export function TasksPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [attachmentModalOpen, setAttachmentModalOpen] = useState(false);
   const [filters, setFilters] = useState({ keyword: '', status: undefined as string | undefined, category: undefined as string | undefined, customerId: searchParams.get('customerId') || undefined, projectId: searchParams.get('projectId') || undefined });
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 12 });
   const operatorName = user?.name || user?.account || '当前用户';
   const taskDefaults = useMemo(() => ({
     category: enumValues(data?.bootstrap?.enumItems || [], 'task_category', ['需求'])[0],
     status: enumValues(data?.bootstrap?.enumItems || [], 'task_status', ['待处理'])[0],
     priority: enumValues(data?.bootstrap?.enumItems || [], 'task_priority', ['中'])[0],
   }), [data?.bootstrap?.enumItems]);
+  const taskCategoryMap = useMemo(() => new Map((data?.bootstrap?.enumItems || [])
+    .filter((item) => item.enumType === 'task_category')
+    .map((item) => [item.value, item])), [data?.bootstrap?.enumItems]);
 
   useEffect(() => {
     setFilters((prev) => ({ ...prev, customerId: searchParams.get('customerId') || undefined, projectId: searchParams.get('projectId') || undefined }));
+    setPagination((prev) => ({ ...prev, current: 1 }));
   }, [searchParams]);
 
   const completedStatusValues = useMemo(() => new Set((data?.bootstrap?.enumItems || [])
@@ -61,35 +79,64 @@ export function TasksPage() {
     .map((item) => item.value)
     .filter(Boolean)), [data?.bootstrap?.enumItems]);
 
-  const tasks = useMemo(() => {
-    const requestedId = searchParams.get('id');
-    const assigneeScope = searchParams.get('assignee');
-    const statusScope = searchParams.get('status');
-    const explicitUserId = searchParams.get('assigneeUserId') || searchParams.get('userId');
-    const relationScope = searchParams.get('scope');
-    const currentUser = resolveTaskUser(data?.bootstrap?.users || [], user, explicitUserId);
-    return (data?.tasks || [])
-      .filter((task) => {
-        if (requestedId && task.id !== requestedId) return false;
-        if (relationScope === 'related' && !taskRelatedToUser(task, currentUser)) return false;
-        if (assigneeScope === 'me') {
-          if (isClosedTaskStatus(task.status) || !taskAssignedToUser(task, currentUser)) return false;
-        }
-        if (assigneeScope === 'others') {
-          if (isClosedTaskStatus(task.status) || !taskRelatedToUser(task, currentUser) || taskAssignedToUser(task, currentUser)) return false;
-        }
-        if (statusScope === 'completed' && !completedStatusValues.has(String(task.status || '')) && !isCompletedTaskStatus(task.status)) return false;
-        const matchesKeyword = includesKeyword([task.taskNo, task.title, task.description, task.projectName, task.customerName], filters.keyword);
-        const matchesStatus = !filters.status || task.status === filters.status;
-        const matchesCategory = !filters.category || task.category === filters.category;
-        const matchesCustomer = !filters.customerId || task.customerId === filters.customerId;
-        const matchesProject = !filters.projectId || task.projectId === filters.projectId;
-        return matchesKeyword && matchesStatus && matchesCategory && matchesCustomer && matchesProject;
-      })
-      .sort((left, right) => compareDateDesc(left.createdAt, right.createdAt) || String(right.id || '').localeCompare(String(left.id || '')));
-  }, [completedStatusValues, data?.bootstrap?.users, data?.tasks, filters, searchParams, user]);
+  const requestedTaskId = searchParams.get('id') || undefined;
+  const assigneeScope = searchParams.get('assignee') || undefined;
+  const statusScope = searchParams.get('status') || undefined;
+  const relationScope = searchParams.get('scope') || undefined;
+  const explicitUserId = searchParams.get('assigneeUserId') || searchParams.get('userId');
+  const currentUser = resolveTaskUser(data?.bootstrap?.users || [], user, explicitUserId);
+  const taskPageQuery = useQuery({
+    queryKey: ['kpm', 'tasks-page', filters, requestedTaskId, assigneeScope, statusScope, relationScope, currentUser.id, Array.from(completedStatusValues), pagination.current, pagination.pageSize],
+    queryFn: () => kpmApi.tasksPage({
+      keyword: filters.keyword,
+      status: filters.status,
+      category: filters.category,
+      customerId: filters.customerId,
+      projectId: filters.projectId,
+      id: requestedTaskId,
+      userId: currentUser.id,
+      assignee: assigneeScope,
+      scope: relationScope,
+      statusScope,
+      completedStatuses: Array.from(completedStatusValues),
+      page: pagination.current,
+      pageSize: pagination.pageSize,
+    }),
+    enabled: Boolean(data?.bootstrap),
+    placeholderData: (previous) => previous,
+    staleTime: 10_000,
+  });
+  const tasks = taskPageQuery.data?.items || [];
 
-  const activeDetail = useMemo(() => detail ? (data?.tasks || []).find((task) => task.id === detail.id) || detail : null, [data?.tasks, detail]);
+  function refreshTaskPage() {
+    refresh();
+    queryClient.invalidateQueries({ queryKey: ['kpm', 'tasks-page'] });
+  }
+
+  const activeDetail = useMemo(() => {
+    if (!detail) return null;
+    const summary = tasks.find((task) => task.id === detail.id);
+    return summary
+      ? { ...detail, ...summary, attachments: detail.attachments, comments: detail.comments }
+      : detail;
+  }, [tasks, detail]);
+  const activeDetailId = activeDetail?.id;
+  const commentQuery = useInfiniteQuery({
+    queryKey: taskCommentsKey(activeDetailId),
+    enabled: Boolean(activeDetailId),
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) =>
+      kpmApi.taskCommentsPage(activeDetailId!, {
+        page: Number(pageParam),
+        pageSize: TASK_COMMENT_PAGE_SIZE,
+      }),
+    getNextPageParam: (lastPage) =>
+      lastPage.hasNext ? lastPage.page + 1 : undefined,
+  });
+  const visibleComments = useMemo(
+    () => commentQuery.data?.pages.flatMap((page) => page.items || []) || [],
+    [commentQuery.data],
+  );
 
   function openCreate(initial?: Partial<Task>) {
     setEditing(null);
@@ -103,6 +150,11 @@ export function TasksPage() {
     form.resetFields();
     form.setFieldsValue({ ...task, files: [] });
     setModalOpen(true);
+  }
+
+  async function openDetail(task: Task) {
+    const full = await kpmApi.task(task.id);
+    setDetail(full);
   }
 
   async function attachTaskFiles(taskId: string, files: File[]) {
@@ -127,11 +179,11 @@ export function TasksPage() {
         saved = await kpmApi.createTask(payload);
       }
       const updated = await attachTaskFiles(saved.id, files);
-      if (editing && updated) setDetail(updated);
+      if (editing) setDetail(updated || saved);
       message.success(editing ? '任务已更新' : '任务已创建');
       setModalOpen(false);
       form.resetFields();
-      refresh();
+      refreshTaskPage();
     });
   }
 
@@ -148,7 +200,8 @@ export function TasksPage() {
     setDetail(updated);
     message.success('评论已发布');
     commentForm.resetFields();
-    refresh();
+    await queryClient.invalidateQueries({ queryKey: taskCommentsKey(activeDetail.id) });
+    refreshTaskPage();
   }
 
   async function addExistingTaskAttachments() {
@@ -164,7 +217,7 @@ export function TasksPage() {
     message.success('附件已上传');
     setAttachmentModalOpen(false);
     attachmentForm.resetFields();
-    refresh();
+    refreshTaskPage();
   }
 
   function deleteTaskAttachment(file: AnyRecord) {
@@ -173,20 +226,28 @@ export function TasksPage() {
       const updated = await kpmApi.deleteTaskAttachment(activeDetail.id, file.id);
       setDetail(updated);
       message.success('附件已删除');
-      refresh();
+      refreshTaskPage();
     });
+  }
+
+  function handleCommentScroll(event: UIEvent<HTMLDivElement>) {
+    const target = event.currentTarget;
+    const nearBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 24;
+    if (nearBottom && commentQuery.hasNextPage && !commentQuery.isFetchingNextPage) {
+      void commentQuery.fetchNextPage();
+    }
   }
 
   return (
     <PageScaffold title="任务管理" subtitle="记录和管理项目成员日常任务，支持客户、项目、阶段维度关联。" extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate()}>新增任务</Button>}>
-      <DataState loading={isLoading} error={error}>
+      <DataState loading={isLoading || taskPageQuery.isLoading} error={error || taskPageQuery.error}>
         <Card className="kpm-card kpm-filter-card">
           <Space wrap>
-            <Input.Search allowClear placeholder="搜索任务编号 / 标题 / 项目 / 客户" onSearch={(keyword) => setFilters((prev) => ({ ...prev, keyword }))} onChange={(e) => setFilters((prev) => ({ ...prev, keyword: e.target.value }))} />
-            <EnumSelect bootstrap={data?.bootstrap} enumType="task_status" placeholder="任务状态" value={filters.status} onChange={(status) => setFilters((prev) => ({ ...prev, status }))} style={{ width: 160 }} />
-            <EnumSelect bootstrap={data?.bootstrap} enumType="task_category" placeholder="任务分类" value={filters.category} onChange={(category) => setFilters((prev) => ({ ...prev, category }))} style={{ width: 160 }} />
-            <CustomerSelect customers={data?.customers} placeholder="客户" value={filters.customerId} onChange={(customerId) => setFilters((prev) => ({ ...prev, customerId }))} style={{ width: 220 }} />
-            <ProjectSelect projects={data?.projects} placeholder="项目" value={filters.projectId} onChange={(projectId) => setFilters((prev) => ({ ...prev, projectId }))} style={{ width: 220 }} />
+            <Input.Search allowClear placeholder="搜索任务编号 / 标题 / 项目 / 客户" onSearch={(keyword) => { setPagination((prev) => ({ ...prev, current: 1 })); setFilters((prev) => ({ ...prev, keyword })); }} onChange={(e) => { setPagination((prev) => ({ ...prev, current: 1 })); setFilters((prev) => ({ ...prev, keyword: e.target.value })); }} />
+            <EnumSelect bootstrap={data?.bootstrap} enumType="task_status" placeholder="任务状态" value={filters.status} onChange={(status) => { setPagination((prev) => ({ ...prev, current: 1 })); setFilters((prev) => ({ ...prev, status })); }} style={{ width: 160 }} />
+            <EnumSelect bootstrap={data?.bootstrap} enumType="task_category" placeholder="任务分类" value={filters.category} onChange={(category) => { setPagination((prev) => ({ ...prev, current: 1 })); setFilters((prev) => ({ ...prev, category })); }} style={{ width: 160 }} />
+            <CustomerSelect customers={data?.customers} placeholder="客户" value={filters.customerId} onChange={(customerId) => { setPagination((prev) => ({ ...prev, current: 1 })); setFilters((prev) => ({ ...prev, customerId })); }} style={{ width: 220 }} />
+            <ProjectSelect projects={data?.projects} placeholder="项目" value={filters.projectId} onChange={(projectId) => { setPagination((prev) => ({ ...prev, current: 1 })); setFilters((prev) => ({ ...prev, projectId })); }} style={{ width: 220 }} />
           </Space>
         </Card>
         <Card className="kpm-card">
@@ -194,17 +255,20 @@ export function TasksPage() {
             size="small"
             rowKey="id"
             dataSource={tasks}
-            pagination={{ pageSize: 12, showSizeChanger: true }}
+            pagination={{ current: pagination.current, pageSize: pagination.pageSize, total: taskPageQuery.data?.total || 0, showSizeChanger: true, onChange: (current, pageSize) => setPagination({ current, pageSize }) }}
             columns={[
               { title: '编号', dataIndex: 'taskNo', width: 110, render: (value, row) => <Typography.Text code>{value || compactId(row.id, 'task')}</Typography.Text> },
-              { title: '标题', dataIndex: 'title', ellipsis: true, render: (title, row) => <button className="link-button truncate" type="button" onClick={() => setDetail(row)}>{title}</button> },
-              { title: '分类', dataIndex: 'category', width: 100, render: (value) => <Tag>{value || '-'}</Tag> },
+              { title: '标题', dataIndex: 'title', ellipsis: true, render: (title, row) => <button className="link-button truncate" type="button" onClick={() => openDetail(row)}>{title}</button> },
+              { title: '分类', dataIndex: 'category', width: 74, align: 'center', render: (value) => {
+                const item = taskCategoryMap.get(value);
+                return <TaskCategoryTag value={value} label={enumDisplayLabel(item, i18n.language) || value} shortLabel={enumShortLabel(item, i18n.language)} />;
+              } },
               { title: '状态', dataIndex: 'status', width: 120, render: (value) => <StatusTag value={value} /> },
-              { title: '优先级', dataIndex: 'priority', width: 90 },
-              { title: '项目/客户', width: 210, render: (_, row) => <span className="subtle-text">{row.projectName || '中性任务'} / {row.customerName || '所有客户'}</span> },
+              { title: '优先级', dataIndex: 'priority', width: 90, render: (value) => <TaskPriorityTag value={value} /> },
+              { title: '项目/客户', width: 230, render: (_, row) => <Space wrap size={[4, 4]}><TaskProjectTag value={row.projectName} />{row.customerName ? <Tag color="default">{row.customerName}</Tag> : <Tag color="default">所有客户</Tag>}</Space> },
               { title: '执行者', dataIndex: 'assignees', width: 160, render: (names?: string[]) => <Space wrap>{(names || []).slice(0, 2).map((name) => <Tag key={name}>{name}</Tag>)}</Space> },
               { title: '预期完成', dataIndex: 'expectedCompletionAt', width: 120, render: dateText },
-              { title: '操作', width: 112, fixed: 'right', render: (_, row) => <ActionButtons onView={() => setDetail(row)} onEdit={() => openEdit(row)} onDelete={() => kpmApi.deleteTask(row.id).then(() => { message.success('任务已删除'); refresh(); })} /> },
+              { title: '操作', width: 112, fixed: 'right', render: (_, row) => <ActionButtons onView={() => openDetail(row)} onEdit={() => openEdit(row)} onDelete={() => kpmApi.deleteTask(row.id).then(() => { message.success('任务已删除'); refreshTaskPage(); })} /> },
             ]}
           />
         </Card>
@@ -256,12 +320,16 @@ export function TasksPage() {
             </Card>
             <Card size="small" title="评论 / 留言">
               <Space direction="vertical" style={{ width: '100%' }}>
-                {(activeDetail.comments || []).map((comment: AnyRecord) => <article className="kpm-comment" key={comment.id}>
-                  <Space size={8} wrap><strong>{comment.author}</strong><Tag color={comment.commentType === 'external' ? 'processing' : 'default'}>{comment.commentType === 'external' ? '外部留言' : '内部留言'}</Tag></Space>
-                  <Typography.Paragraph>{comment.content || '-'}</Typography.Paragraph>
-                  {(comment.attachments || []).length ? <Space wrap>{comment.attachments.map((file: AnyRecord, index: number) => <Tag key={file.objectKey || file.fileName || index} onClick={() => downloadBusinessFile(file).catch((err) => message.error(err.message || '下载失败'))} className="clickable-tag">{file.fileName || file.name || '附件'}</Tag>)}</Space> : null}
-                  <small>{dateTimeText(comment.createdAt)}</small>
-                </article>)}
+                <div className="kpm-comment-scroll-list" onScroll={handleCommentScroll}>
+                  {visibleComments.length ? visibleComments.map((comment: AnyRecord) => <article className="kpm-comment" key={comment.id}>
+                    <Space size={8} wrap><strong>{comment.author}</strong><Tag color={comment.commentType === 'external' ? 'processing' : 'default'}>{comment.commentType === 'external' ? '外部留言' : '内部留言'}</Tag></Space>
+                    <Typography.Paragraph>{comment.content || '-'}</Typography.Paragraph>
+                    {(comment.attachments || []).length ? <Space wrap>{comment.attachments.map((file: AnyRecord, index: number) => <Tag key={file.objectKey || file.fileName || index} onClick={() => downloadBusinessFile(file).catch((err) => message.error(err.message || '下载失败'))} className="clickable-tag">{file.fileName || file.name || '附件'}</Tag>)}</Space> : null}
+                    <small>{dateTimeText(comment.createdAt)}</small>
+                  </article>) : <Typography.Text type="secondary">暂无评论</Typography.Text>}
+                  {commentQuery.isFetchingNextPage ? <Typography.Text type="secondary">加载更多评论...</Typography.Text> : null}
+                  {!commentQuery.hasNextPage && visibleComments.length ? <Typography.Text type="secondary">没有更多评论</Typography.Text> : null}
+                </div>
                 <Form form={commentForm} layout="vertical">
                   <Form.Item name="commentType" label="留言类型" initialValue="internal">
                     <Radio.Group optionType="button" buttonStyle="solid" options={[{ label: '内部留言', value: 'internal' }, { label: '外部留言（客户可见）', value: 'external' }]} />

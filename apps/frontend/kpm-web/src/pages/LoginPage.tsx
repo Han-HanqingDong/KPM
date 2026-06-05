@@ -1,5 +1,5 @@
 import { LockOutlined, MailOutlined } from '@ant-design/icons';
-import { Button, Card, Form, Input, Typography } from 'antd';
+import { Button, Card, Form, Input, Typography, message } from 'antd';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -27,6 +27,8 @@ export function LoginPage() {
       await login(values.account, values.password);
       const from = (location.state as { from?: string } | null)?.from || '/dashboard';
       navigate(from, { replace: true });
+    } catch {
+      message.error(t('login.invalidCredentials'));
     } finally {
       setSubmitting(false);
     }
@@ -42,7 +44,7 @@ export function LoginPage() {
           <KozenLogo compact />
           <strong>KOZEN</strong>
         </div>
-        <Typography.Title level={1}>{t('login.projectManagement')}</Typography.Title>
+        <Typography.Title level={1}>Project Management</Typography.Title>
         <p>TO COLLABORATE WITH GLOBAL LEADERS</p>
         <div className="kpm-login-orbit" aria-hidden="true">
           <span /><span /><span />

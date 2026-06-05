@@ -197,6 +197,13 @@ public class BearerTokenGatewayFilter implements GlobalFilter, Ordered {
             if ("DELETE".equals(verb)) return "button:customers:delete";
         }
 
+        if (path.startsWith("/api/knowledge")) {
+            if (path.matches("/api/knowledge/[^/]+/status")) return "button:knowledge:review";
+            if ("POST".equals(verb) && path.equals("/api/knowledge")) return "button:knowledge:create";
+            if ("PUT".equals(verb)) return "button:knowledge:edit";
+            if ("DELETE".equals(verb)) return "button:knowledge:delete";
+        }
+
         if (path.startsWith("/api/projects")) {
             if (path.equals("/api/projects/templates")) return "POST".equals(verb) ? "button:templates:create" : null;
             if (path.matches("/api/projects/templates/[^/]+")) return "DELETE".equals(verb) ? "button:templates:delete" : "button:templates:edit";
@@ -209,6 +216,9 @@ public class BearerTokenGatewayFilter implements GlobalFilter, Ordered {
             if (path.matches("/api/projects/stages/[^/]+/materials")) return "button:stage-detail:publish-file";
             if (path.matches("/api/projects/[^/]+/materials") && "POST".equals(verb)) return "button:project-materials:upload";
             if (path.matches("/api/projects/[^/]+/materials/[^/]+/public")) return "button:project-materials:publish-customer";
+            if (path.matches("/api/projects/[^/]+/materials/[^/]+/retract")) return "button:project-materials:publish-customer";
+            if (path.matches("/api/projects/[^/]+/materials/[^/]+") && "DELETE".equals(verb)) return "button:project-materials:upload";
+            if (path.matches("/api/projects/[^/]+/announcements/[^/]+/retract")) return "button:project-detail:publish-announcement";
             if (path.matches("/api/projects/[^/]+/announcements")) return "button:project-detail:publish-announcement";
             if (path.matches("/api/projects/stage-materials/[^/]+/publish")) return "button:stage-detail:publish-file";
             if (path.matches("/api/projects/[^/]+/customers/[^/]+/requirements")) return "button:requirements:save";
