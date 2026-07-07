@@ -78,9 +78,8 @@
     "frontend": {
       "sourceRepo": "Han-HanqingDong/KPM",
       "dockerfilePath": "railway/frontend.Dockerfile",
-      "publicPort": 80,
+      "runtimePort": "$PORT",
       "variables": {
-        "PORT": "80",
         "KPM_GATEWAY_PROXY_PASS": "http://${{gateway.RAILWAY_PRIVATE_DOMAIN}}:${{gateway.PORT}}"
       }
     }
