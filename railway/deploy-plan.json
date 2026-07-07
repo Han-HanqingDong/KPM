@@ -60,6 +60,19 @@
       "kpm-notification-service",
       "kpm-gateway"
     ],
+    "backendPorts": {
+      "iam-service": "8101",
+      "resource-service": "8102",
+      "project-service": "8103",
+      "customer-service": "8104",
+      "task-service": "8105",
+      "order-service": "8106",
+      "file-service": "8107",
+      "analytics-service": "8108",
+      "integration-service": "8109",
+      "notification-service": "8110",
+      "gateway": "8080"
+    },
     "backendBuildCommandTemplate": "./mvnw -q -DskipTests -pl <module> -am package && mkdir -p target && cp <module>/target/<module>-0.1.0-SNAPSHOT.jar target/app.jar",
     "backendStartCommand": "java -jar target/app.jar",
     "frontend": {
