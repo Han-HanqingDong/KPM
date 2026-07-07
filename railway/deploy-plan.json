@@ -80,6 +80,7 @@
       "dockerfilePath": "railway/frontend.Dockerfile",
       "publicPort": 80,
       "variables": {
+        "PORT": "80",
         "KPM_GATEWAY_PROXY_PASS": "http://${{gateway.RAILWAY_PRIVATE_DOMAIN}}:${{gateway.PORT}}"
       }
     }
