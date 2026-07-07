@@ -6,9 +6,12 @@ server {
     index index.html;
 
     client_max_body_size 520m;
+    resolver ${NGINX_LOCAL_RESOLVERS} valid=10s ipv6=on;
+    resolver_timeout 5s;
 
     location /api/ {
-        proxy_pass ${KPM_GATEWAY_PROXY_PASS}/api/;
+        set $kpm_gateway_origin ${KPM_GATEWAY_PROXY_PASS};
+        proxy_pass $kpm_gateway_origin$request_uri;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
