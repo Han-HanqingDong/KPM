@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: ${PORT:8080}
 
 spring:
   application:
@@ -41,43 +41,43 @@ spring:
             - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials Access-Control-Allow-Methods Access-Control-Allow-Headers Access-Control-Expose-Headers RETAIN_FIRST
           routes:
             - id: iam
-              uri: lb://kpm-iam-service
+              uri: ${KPM_ROUTE_IAM_URI:lb://kpm-iam-service}
               predicates:
                 - Path=/api/iam/**
             - id: resources
-              uri: lb://kpm-resource-service
+              uri: ${KPM_ROUTE_RESOURCES_URI:lb://kpm-resource-service}
               predicates:
                 - Path=/api/resources/**
             - id: projects
-              uri: lb://kpm-project-service
+              uri: ${KPM_ROUTE_PROJECTS_URI:lb://kpm-project-service}
               predicates:
                 - Path=/api/projects/**
             - id: customers
-              uri: lb://kpm-customer-service
+              uri: ${KPM_ROUTE_CUSTOMERS_URI:lb://kpm-customer-service}
               predicates:
                 - Path=/api/customers/**,/api/customer-portal/**,/api/knowledge/**
             - id: tasks
-              uri: lb://kpm-task-service
+              uri: ${KPM_ROUTE_TASKS_URI:lb://kpm-task-service}
               predicates:
                 - Path=/api/tasks/**
             - id: orders
-              uri: lb://kpm-order-service
+              uri: ${KPM_ROUTE_ORDERS_URI:lb://kpm-order-service}
               predicates:
                 - Path=/api/orders/**
             - id: files
-              uri: lb://kpm-file-service
+              uri: ${KPM_ROUTE_FILES_URI:lb://kpm-file-service}
               predicates:
                 - Path=/api/files/**
             - id: analytics
-              uri: lb://kpm-analytics-service
+              uri: ${KPM_ROUTE_ANALYTICS_URI:lb://kpm-analytics-service}
               predicates:
                 - Path=/api/analytics/**
             - id: integrations
-              uri: lb://kpm-integration-service
+              uri: ${KPM_ROUTE_INTEGRATIONS_URI:lb://kpm-integration-service}
               predicates:
                 - Path=/api/integrations/**
             - id: notifications
-              uri: lb://kpm-notification-service
+              uri: ${KPM_ROUTE_NOTIFICATIONS_URI:lb://kpm-notification-service}
               predicates:
                 - Path=/api/notifications/**
 

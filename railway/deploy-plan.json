@@ -1,0 +1,72 @@
+{
+  "projectName": "henry-kpm",
+  "repository": "Han-HanqingDong/KPM",
+  "environment": "production",
+  "backendCommonVariables": {
+    "KPM_DB_HOST": "${{postgres.RAILWAY_PRIVATE_DOMAIN}}",
+    "KPM_DB_PORT": "5432",
+    "KPM_DB_NAME": "kpm",
+    "KPM_DB_USER": "kpm",
+    "KPM_DB_PASSWORD": "${{postgres.POSTGRES_PASSWORD}}",
+    "KPM_VALKEY_HOST": "${{valkey.RAILWAY_PRIVATE_DOMAIN}}",
+    "KPM_VALKEY_PORT": "6379",
+    "KPM_NACOS_ENABLED": "false",
+    "KPM_NACOS_CONFIG_ENABLED": "false",
+    "KPM_AUTH_ENABLED": "true",
+    "KPM_RBAC_ENABLED": "true",
+    "KPM_AUTH_TOKEN_SECRET": "<generate strong secret>",
+    "KPM_LOG_PATH": "/tmp/kpm-logs",
+    "JAVA_TOOL_OPTIONS": "-Xms128m -Xmx512m -XX:+UseG1GC -Duser.timezone=Asia/Shanghai"
+  },
+  "gatewayVariables": {
+    "KPM_IAM_URI": "http://${{iam-service.RAILWAY_PRIVATE_DOMAIN}}:${{iam-service.PORT}}",
+    "KPM_ROUTE_IAM_URI": "http://${{iam-service.RAILWAY_PRIVATE_DOMAIN}}:${{iam-service.PORT}}",
+    "KPM_ROUTE_RESOURCES_URI": "http://${{resource-service.RAILWAY_PRIVATE_DOMAIN}}:${{resource-service.PORT}}",
+    "KPM_ROUTE_PROJECTS_URI": "http://${{project-service.RAILWAY_PRIVATE_DOMAIN}}:${{project-service.PORT}}",
+    "KPM_ROUTE_CUSTOMERS_URI": "http://${{customer-service.RAILWAY_PRIVATE_DOMAIN}}:${{customer-service.PORT}}",
+    "KPM_ROUTE_TASKS_URI": "http://${{task-service.RAILWAY_PRIVATE_DOMAIN}}:${{task-service.PORT}}",
+    "KPM_ROUTE_ORDERS_URI": "http://${{order-service.RAILWAY_PRIVATE_DOMAIN}}:${{order-service.PORT}}",
+    "KPM_ROUTE_FILES_URI": "http://${{file-service.RAILWAY_PRIVATE_DOMAIN}}:${{file-service.PORT}}",
+    "KPM_ROUTE_ANALYTICS_URI": "http://${{analytics-service.RAILWAY_PRIVATE_DOMAIN}}:${{analytics-service.PORT}}",
+    "KPM_ROUTE_INTEGRATIONS_URI": "http://${{integration-service.RAILWAY_PRIVATE_DOMAIN}}:${{integration-service.PORT}}",
+    "KPM_ROUTE_NOTIFICATIONS_URI": "http://${{notification-service.RAILWAY_PRIVATE_DOMAIN}}:${{notification-service.PORT}}"
+  },
+  "services": {
+    "postgres": {
+      "sourceRepo": "Han-HanqingDong/KPM",
+      "dockerfilePath": "railway/postgres.Dockerfile",
+      "volumeMountPath": "/var/lib/postgresql/data",
+      "variables": {
+        "POSTGRES_DB": "kpm",
+        "POSTGRES_USER": "kpm",
+        "POSTGRES_PASSWORD": "<generate strong secret>",
+        "TZ": "Asia/Shanghai"
+      }
+    },
+    "valkey": {
+      "sourceImage": "valkey/valkey:8-alpine",
+      "volumeMountPath": "/data"
+    },
+    "backendModules": [
+      "kpm-iam-service",
+      "kpm-resource-service",
+      "kpm-project-service",
+      "kpm-customer-service",
+      "kpm-task-service",
+      "kpm-order-service",
+      "kpm-file-service",
+      "kpm-analytics-service",
+      "kpm-integration-service",
+      "kpm-notification-service",
+      "kpm-gateway"
+    ],
+    "frontend": {
+      "sourceRepo": "Han-HanqingDong/KPM",
+      "dockerfilePath": "railway/frontend.Dockerfile",
+      "publicPort": 80,
+      "variables": {
+        "KPM_GATEWAY_PROXY_PASS": "http://${{gateway.RAILWAY_PRIVATE_DOMAIN}}:${{gateway.PORT}}"
+      }
+    }
+  }
+}
