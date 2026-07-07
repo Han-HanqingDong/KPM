@@ -35,7 +35,7 @@
     "postgres": {
       "sourceRepo": "Han-HanqingDong/KPM",
       "dockerfilePath": "railway/postgres.Dockerfile",
-      "volumeMountPath": "/var/lib/postgresql/data",
+      "volumeMountPath": "/var/lib/postgresql",
       "variables": {
         "POSTGRES_DB": "kpm",
         "POSTGRES_USER": "kpm",
