@@ -22,10 +22,12 @@ For each backend service, set:
 
 ```text
 root directory: /apps/backend
-build command: ./mvnw -q -DskipTests -pl <module> -am package
-start command: java -jar <module>/target/<module>-0.1.0-SNAPSHOT.jar
+build command: ./mvnw -q -DskipTests -pl <module> -am package && mkdir -p target && cp <module>/target/<module>-0.1.0-SNAPSHOT.jar target/app.jar
+start command: java -jar target/app.jar
 health check path: /actuator/health
 ```
+
+The copy step is required because Railpack's Java runtime expects a root-level `target` directory when it prepares the deployment image.
 
 Spring Boot service ports read Railway's `PORT` variable and keep the existing local defaults as fallbacks.
 

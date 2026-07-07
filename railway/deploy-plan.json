@@ -60,6 +60,8 @@
       "kpm-notification-service",
       "kpm-gateway"
     ],
+    "backendBuildCommandTemplate": "./mvnw -q -DskipTests -pl <module> -am package && mkdir -p target && cp <module>/target/<module>-0.1.0-SNAPSHOT.jar target/app.jar",
+    "backendStartCommand": "java -jar target/app.jar",
     "frontend": {
       "sourceRepo": "Han-HanqingDong/KPM",
       "dockerfilePath": "railway/frontend.Dockerfile",
